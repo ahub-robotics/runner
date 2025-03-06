@@ -85,9 +85,8 @@ class Runner:
         This method is used to set the robot parameters sent from the robot manager console.
         """
         if len(params) > 0:
-            self.robot_params = params
             for key in params:
-                string = self.robot_params[key]
+                string = params[key]
                 if "base64" in string:
                     try:
                         # Remove any whitespace characters like newlines, spaces, etc.
@@ -99,9 +98,10 @@ class Runner:
                         f = open(os.path.join(folder, filename), "wb")
                         f.write(file)
                         f.close()
-                        self.robot_params[key] = f
+                        params[key] = os.path.join(folder, filename)
                     except Exception as e:
                         print(e)
+        return params
 
     def set_robot(self, data):
         """
@@ -110,13 +110,13 @@ class Runner:
         self.robot_id = data['robot']
         self.execution_id = data['execution']
         self.branch = data["branch"]
-
+        self.get_robot_data()
+        self.set_robot_folder()
         if data['params']:
             self.robot_params = self.set_robo_params(data['params'])
         else:
             self.robot_params = "None"
-        self.get_robot_data()
-        self.set_robot_folder()
+
 
     def set_machine_ip(self):
         """
@@ -184,7 +184,8 @@ class Runner:
                     p.kill()
                 else:
                     os.killpg(self.run_robot_process.pid, signal.SIGKILL)
-            self.run_robot_process = None
+        self.run_robot_process = None
+
 
 
     def copy_repo(self):

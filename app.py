@@ -26,7 +26,7 @@ def get_robot_status():
         return jsonify("closed")
 
     if server.run_robot_process:
-        if server.run_robot_process.poll() !=None:
+        if server.run_robot_process.poll() != None:
             if server.status != "closed":
                 server.status = "free"
         else:
@@ -78,7 +78,6 @@ def run_robot():
             response=message,
             status=status,
             mimetype='application/json')
-        server.status = "free"
     except Exception as e:
         server.send_log(str(e))
         server.status = "free"
@@ -184,7 +183,7 @@ def connect():
 
          config_data = {}
          try:
-             server.set_machine_ip()
+             #server.set_machine_ip()
              server.status = 'free'
 
              for field, entry in data.items():
@@ -209,7 +208,7 @@ def connect():
 @app.route('/',  methods=['GET'])
 def home():
     try:
-        server.set_machine_ip()
+        #server.set_machine_ip()
         server.status = 'free'
         return redirect(url_for('connected'))
     except:
@@ -232,7 +231,7 @@ def check_already_running():
 
 def start_server():
     # Inicia el servidor en un hilo separado
-    serve(app, host="0.0.0.0", port=int(server.port))
+    serve(app, host="0.0.0.0", port=server.port)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Introduce las variables de conexión')
