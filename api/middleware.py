@@ -19,25 +19,30 @@ REQUEST_LOG_FILE = Path.home() / 'Robot' / 'requests.log'
 def init_server_if_needed(app):
     """
     Inicializa el servidor si aún no ha sido inicializado.
-    
+
     Esta función se llama antes de cada petición para asegurar que
     el servidor esté disponible incluso cuando Flask se ejecuta como WSGI.
 
     También configura Redis, recupera ejecuciones huérfanas y establece estado a "free".
-    
+
     Args:
         app: Flask application instance
     """
-    from . import _server
+    from . import get_server, set_server
     from shared.config.loader import get_config_data
     from shared.state.redis_state import redis_state
     from executors.server import Server
-    
-    if _server is None:
+
+    current_server = get_server()
+
+    if current_server is None:
         config = get_config_data()
         server = Server(config)
-        
-        # Store in app-level variable
+
+        # Store globally
+        set_server(server)
+
+        # Also store in app-level variable for easy access
         app._server = server
 
         # Configurar Redis state manager con machine_id
@@ -50,10 +55,10 @@ def init_server_if_needed(app):
         # Establecer estado inicial a "free" y notificar al orquestador
         print("[INIT] Estableciendo estado inicial a 'free'")
         server.change_status("free", notify_remote=True)
-        
+
         return server
-    
-    return _server
+
+    return current_server
 
 
 def log_request_to_file(method, path, remote_addr, status_code):
