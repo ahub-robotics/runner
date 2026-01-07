@@ -14,7 +14,7 @@ from .config import celery_app
 # IMPORTANTE: Importar tasks para registrarlos con Celery
 try:
     from executors import tasks  # noqa: F401
-    from src import streaming_tasks  # noqa: F401  # Will be migrated in FASE 4
+    from streaming import tasks as streaming_tasks  # noqa: F401
 except ImportError:
     # During migration, these may not be available yet
     pass

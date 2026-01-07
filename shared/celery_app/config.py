@@ -54,15 +54,15 @@ celery_app.conf.update(
     broker_connection_max_retries=10,
 
     # Tasks to include
-    include=['executors.tasks', 'src.streaming_tasks'],  # src.streaming_tasks will be migrated in FASE 4
+    include=['executors.tasks', 'streaming.tasks'],
 
     # Logging
     worker_log_format='[%(asctime)s: %(levelname)s/%(processName)s] %(message)s',
     worker_task_log_format='[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s',
 )
 
-# Auto-discover tasks from executors and src (streaming tasks still in src)
-celery_app.autodiscover_tasks(['executors', 'src'])
+# Auto-discover tasks from executors and streaming
+celery_app.autodiscover_tasks(['executors', 'streaming'])
 
 if __name__ == '__main__':
     celery_app.start()
