@@ -1,0 +1,20 @@
+[req]
+default_bits = 4096
+prompt = no
+default_md = sha256
+distinguished_name = dn
+x509_extensions = v3_ca
+
+[dn]
+C = US
+ST = State
+L = City
+O = Robot Runner
+OU = Certificate Authority
+CN = Robot Runner Root CA
+
+[v3_ca]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,digitalSignature,cRLSign,keyCertSign

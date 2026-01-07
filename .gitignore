@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.tmp
+*~
+
+# Logs
+*.log
+logs/
+
+# SSL certificates (keep only templates, not actual certificates)
+# Los certificados reales no deben versionarse por seguridad
+# ca-key.pem
+# *.key
+# *.pem (comentado porque necesitamos versionar algunos)
+
+# Temporary files
+.last_robot_cert
+CA-INFO.txt
+*.srl
+
+# Build files
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec.backup
+
+# PyInstaller
+*.manifest
+*.spec.backup
+
+# Config files with sensitive data (opcional)
+# config.json
+
+# Qodo
+.qodo/

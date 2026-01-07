@@ -1,17 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+# =================================================================
+# PyInstaller Spec File - Robot Runner
+# =================================================================
+# Este archivo define cómo empaquetar Robot Runner en un ejecutable.
+#
+# Uso:
+#     pyinstaller app.spec
+#
+# El ejecutable resultará en: dist/RobotRunner/
+# =================================================================
 
 a = Analysis(
-    ['app.py'],
-    pathex=['.'],
-    binaries=[],
+    ['run.py'],  # Entry point principal (antes: app.py)
+    pathex=['.'],  # Rutas de búsqueda para módulos
+    binaries=[],  # Binarios adicionales a incluir
     datas=[
-    ('templates', 'templates'),
-    ('static', 'static'),
-    ('config.json','.'),
-    ('Robots','Robots')
+        # Archivos de datos a incluir en el ejecutable
+        ('templates', 'templates'),  # Templates HTML de Flask
+        ('static', 'static'),  # Archivos estáticos (CSS, JS, imágenes)
+        ('config.json', '.'),  # Archivo de configuración
+        ('Robots', 'Robots'),  # Scripts de robots
+        ('ssl', 'ssl'),  # Certificados SSL
+        ('src', 'src'),  # Paquete src/ con código del servidor
     ],
-    hiddenimports=[],
+    hiddenimports=[
+        # Imports que PyInstaller podría no detectar automáticamente
+        'src',
+        'src.app',
+        'src.server',
+        'src.robot',
+        'src.config',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -19,6 +38,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -27,20 +47,20 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='RobotRunner',
-    debug=False,
+    name='RobotRunner',  # Nombre del ejecutable
+    debug=False,  # No incluir debugging
     bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
+    strip=False,  # No strip symbols
+    upx=True,  # Comprimir con UPX
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=False,  # No mostrar consola (modo GUI)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='logo.ico',
+    icon='resources/logo.ico',  # Icono de la aplicación
 )
 
 coll = COLLECT(
@@ -51,5 +71,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='RobotRunner'
+    name='RobotRunner'  # Nombre del directorio de distribución
 )

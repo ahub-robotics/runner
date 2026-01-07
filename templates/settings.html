@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="google" content="notranslate">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Runner - Configuración</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5568d3;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+            --dark-color: #1e293b;
+            --light-bg: rgba(248, 250, 252, 0.7);
+            --card-bg: rgba(0,0,0,0.5) !important;
+            --border-color: rgba(226, 232, 240, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: url("{{ url_for('static', filename='images/background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .dashboard-header {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px 35px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-container {
+            width: 60px;
+            height: 60px;
+            background: #007bff;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .logo-container img {
+            width: 40px;
+            height: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        .header-title h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0;
+        }
+
+        .header-title p {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin: 0;
+        }
+
+        /* Card Styles */
+        .dashboard-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            margin-bottom: 25px;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--primary-color);
+            color: #fff;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+            outline: none;
+        }
+
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .form-text {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            color: #fff;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .alert {
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: none;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .header-title h1 {
+                font-size: 1.4rem;
+            }
+
+            .dashboard-card {
+                padding: 25px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn-primary, .btn-secondary {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="header-left">
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Robot Runner Logo">
+                </div>
+                <div class="header-title">
+                    <h1>Configuración del Sistema</h1>
+                    <p>Administra la configuración del robot y túnel Cloudflare</p>
+                </div>
+            </div>
+            <div>
+                <a href="{{ url_for('connected') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Settings Form -->
+        <div class="dashboard-card">
+            <div class="card-title">
+                <i class="fas fa-cog"></i> Configuración General
+            </div>
+
+            <form method="POST" action="{{ url_for('settings') }}">
+                <!-- URL del Orquestador -->
+                <div class="form-group">
+                    <label for="url">
+                        <i class="fas fa-server"></i> URL del Orquestador
+                    </label>
+                    <input
+                        type="url"
+                        class="form-control"
+                        id="url"
+                        name="url"
+                        value="{{ config.get('url', '') }}"
+                        placeholder="https://console.example.com"
+                        required
+                    >
+                    <small class="form-text">URL del servidor orquestador que controla este robot</small>
+                </div>
+
+                <!-- Token de Autenticación -->
+                <div class="form-group">
+                    <label for="token">
+                        <i class="fas fa-key"></i> Token de Autenticación
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="token"
+                        name="token"
+                        value="{{ config.get('token', '') }}"
+                        placeholder="Token de autenticación"
+                        required
+                    >
+                    <small class="form-text">Token secreto para autenticación con el orquestador</small>
+                </div>
+
+                <!-- Machine ID -->
+                <div class="form-group">
+                    <label for="machine_id">
+                        <i class="fas fa-desktop"></i> Machine ID
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="machine_id"
+                        name="machine_id"
+                        value="{{ config.get('machine_id', '') }}"
+                        placeholder="ID único de la máquina"
+                        required
+                    >
+                    <small class="form-text">Identificador único de esta máquina en el sistema</small>
+                </div>
+
+                <!-- License Key -->
+                <div class="form-group">
+                    <label for="license_key">
+                        <i class="fas fa-certificate"></i> License Key
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="license_key"
+                        name="license_key"
+                        value="{{ config.get('license_key', '') }}"
+                        placeholder="License key de la máquina"
+                        required
+                    >
+                    <small class="form-text">Clave de licencia para validar esta máquina</small>
+                </div>
+
+                <!-- IP Pública -->
+                <div class="form-group">
+                    <label for="ip">
+                        <i class="fas fa-network-wired"></i> IP Pública
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="ip"
+                        name="ip"
+                        value="{{ config.get('ip', '0.0.0.0') }}"
+                        placeholder="0.0.0.0"
+                    >
+                    <small class="form-text">Dirección IP en la que el servidor escuchará</small>
+                </div>
+
+                <!-- Puerto del Servidor -->
+                <div class="form-group">
+                    <label for="port">
+                        <i class="fas fa-plug"></i> Puerto del Servidor
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="port"
+                        name="port"
+                        value="{{ config.get('port', '5055') }}"
+                        placeholder="5055"
+                        min="1"
+                        max="65535"
+                    >
+                    <small class="form-text">Puerto en el que el servidor escuchará (default: 5055)</small>
+                </div>
+
+                <!-- Subdominio del Túnel Cloudflare -->
+                <div class="form-group">
+                    <label for="tunnel_subdomain">
+                        <i class="fas fa-cloud"></i> Subdominio del Túnel Cloudflare
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="tunnel_subdomain"
+                        name="tunnel_subdomain"
+                        value="{{ config.get('tunnel_subdomain', '') }}"
+                        placeholder="mi-robot (opcional)"
+                    >
+                    <small class="form-text">
+                        Subdominio personalizado para el túnel (ej: mi-robot.automatehub.es).<br>
+                        Si está vacío, se usará el Machine ID como subdominio.
+                    </small>
+                </div>
+
+                <!-- Tunnel ID (oculto/readonly) -->
+                <input
+                    type="hidden"
+                    name="tunnel_id"
+                    value="{{ config.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b') }}"
+                >
+
+                <!-- Botones -->
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Configuración
+                    </button>
+                    <a href="{{ url_for('connected') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            // Interceptar el submit del formulario
+            $('form').on('submit', function(e) {
+                e.preventDefault();
+
+                const form = $(this);
+                const submitBtn = form.find('button[type="submit"]');
+                const originalHtml = submitBtn.html();
+
+                // Deshabilitar botón y mostrar spinner
+                submitBtn.prop('disabled', true);
+                submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Guardando...');
+
+                // Obtener datos del formulario
+                const formData = new FormData(this);
+
+                // Enviar por AJAX
+                $.ajax({
+                    url: '{{ url_for("settings") }}',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        // Si es JSON, manejar cambio de puerto
+                        if (response && response.port_changed) {
+                            const newPort = response.new_port;
+                            const protocol = window.location.protocol;
+                            const hostname = window.location.hostname;
+
+                            alert(response.message + '\n\nRedirigiendo al nuevo puerto...');
+
+                            // Esperar 3 segundos y redirigir
+                            setTimeout(function() {
+                                window.location.href = protocol + '//' + hostname + ':' + newPort + '/connected';
+                            }, 3000);
+                        } else {
+                            // Si es redirect HTML normal, seguir el redirect
+                            window.location.href = '{{ url_for("settings") }}';
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error al guardar configuración: ' + error);
+                        submitBtn.prop('disabled', false);
+                        submitBtn.html(originalHtml);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

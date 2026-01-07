@@ -1,0 +1,26 @@
+Certificado para: robot-1
+================================
+
+Generado: Mon Nov 17 14:05:53 CET 2025
+Válido hasta: Nov 17 13:05:53 2026 GMT
+
+IPs configuradas:
+  - 192.168.1.100
+
+Firmado por:
+issuer=C=US, ST=State, L=City, O=Robot Runner, OU=Certificate Authority, CN=Robot Runner Root CA
+
+Fingerprint SHA256:
+sha256 Fingerprint=26:FB:1C:D6:2C:B6:B9:5B:E0:FF:88:A6:1A:34:A6:C0:41:60:14:44:5C:F4:BD:B4:F2:6C:C4:BF:D7:7F:F2:E4
+
+Archivos:
+- certs/robot-1/robot-1-key.pem: Clave privada
+- certs/robot-1/robot-1-cert.pem: Certificado firmado
+- certs/robot-1/robot-1.csr: Certificate Signing Request
+
+Para empaquetar:
+  pyinstaller app.spec
+
+Archivos incluidos en el paquete:
+  - cert.pem (copia de robot-1-cert.pem)
+  - key.pem (copia de robot-1-key.pem)

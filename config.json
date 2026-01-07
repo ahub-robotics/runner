@@ -1,8 +1,10 @@
 {
-    "url": "https://robot-console-a73e07ff7a0d.herokuapp.com/",
-    "token": "03ecac8b0ef0117ca61725d4d6c8e372b059bb64",
-    "machine_id": "RQ52JQNWVTWL",
-    "license_key": "G3BLWC8GASIL221XKQ8HPUWH3DE2CU5FE0DU",
-    "ip": "79.143.94.42",
-    "port": "8088"
+    "url": "http://127.0.0.1:8088/",
+    "token": "eff7df3018dc2b2271165865c0f78aa17ce5df27",
+    "machine_id": "I3WFQVS5FDHS",
+    "license_key": "BVXV9JC78STCV89333XVUV5B838LIU1VX4FT",
+    "ip": "0.0.0.0",
+    "port": "5055",
+    "tunnel_subdomain": "I3WFQVS5FDHS.automatehub.es",
+    "tunnel_id": "3d7de42c-4a8a-4447-b14f-053cc485ce6b"
 }

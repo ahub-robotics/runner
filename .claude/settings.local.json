@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(openssl req:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(chmod:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

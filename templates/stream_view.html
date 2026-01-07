@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="google" content="notranslate">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Runner - Live Stream</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5568d3;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --card-bg: rgba(0,0,0,0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: url("{{ url_for('static', filename='images/background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-container {
+            width: 50px;
+            height: 50px;
+            background: #007bff;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container img {
+            width: 30px;
+            height: 30px;
+            filter: brightness(0) invert(1);
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0;
+        }
+
+        .header-title p {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        .stream-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .card-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            color: white;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status-bar {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #1e293b;
+            border-radius: 12px;
+            text-align: center;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .status-bar i {
+            margin-right: 8px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            margin-bottom: 20px;
+        }
+
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+
+        .placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #64748b;
+            text-align: center;
+        }
+
+        .placeholder i {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: #1e293b;
+            border-radius: 12px;
+            color: #94a3b8;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-item i {
+            margin-right: 8px;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            color: #fff;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Robot Runner">
+                </div>
+                <div class="header-title">
+                    <h1>Robot Runner Live Stream</h1>
+                    <p>Transmisión en tiempo real</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-success" id="startBtn" onclick="startStream()">
+                    <i class="fas fa-play"></i> Iniciar
+                </button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopStream()" disabled>
+                    <i class="fas fa-stop"></i> Detener
+                </button>
+            </div>
+        </div>
+
+        <!-- Stream Card -->
+        <div class="stream-card">
+            <div class="status-bar" id="statusBar">
+                <i class="fas fa-circle" style="color: #ef4444;"></i>
+                <span id="statusText">Transmisión inactiva</span>
+            </div>
+
+            <div class="video-container">
+                <img id="streamVideo" src="" alt="Stream en vivo">
+                <div class="placeholder" id="placeholder">
+                    <div>
+                        <i class="fas fa-tv"></i>
+                        <p style="font-size: 1.2rem; margin-bottom: 10px;">Sin señal de video</p>
+                        <p style="font-size: 0.9rem; opacity: 0.7;">Inicia la transmisión para ver la pantalla</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <div><i class="fas fa-signal"></i> FPS</div>
+                    <div class="stat-value" id="fps">0</div>
+                </div>
+                <div class="stat-item">
+                    <div><i class="fas fa-clock"></i> Duración</div>
+                    <div class="stat-value" id="duration">00:00:00</div>
+                </div>
+                <div class="stat-item">
+                    <div><i class="fas fa-users"></i> Clientes</div>
+                    <div class="stat-value" id="clients">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let startTime = null;
+        let durationInterval = null;
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
+        let isTransitioning = false; // Prevent state conflicts during transitions
+
+        function startStream() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando...';
+
+            fetch('/stream/start', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        connectToStream();
+                        startBtn.style.display = 'none';
+                        stopBtn.style.display = 'inline-flex';
+                        stopBtn.disabled = false;
+                        stopBtn.innerHTML = '<i class="fas fa-stop"></i> Detener';
+                    } else {
+                        alert('Error: ' + data.message);
+                        startBtn.innerHTML = '<i class="fas fa-play"></i> Iniciar';
+                        startBtn.disabled = false;
+                    }
+                    isTransitioning = false;
+                })
+                .catch(error => {
+                    alert('Error: ' + error);
+                    startBtn.innerHTML = '<i class="fas fa-play"></i> Iniciar';
+                    startBtn.disabled = false;
+                    isTransitioning = false;
+                });
+        }
+
+        function stopStream() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+
+            const stopBtn = document.getElementById('stopBtn');
+
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deteniendo...';
+
+            fetch('/stream/stop', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    disconnect();
+                    if (!data.success) {
+                        console.error('Error stopping stream:', data.message);
+                    }
+                    isTransitioning = false;
+                })
+                .catch(error => {
+                    console.error('Error stopping stream:', error);
+                    disconnect();
+                    isTransitioning = false;
+                });
+        }
+
+        function connectToStream() {
+            const streamUrl = `${window.location.protocol}//${window.location.host}/stream/feed`;
+
+            console.log('[STREAM-FRONTEND] Conectando a:', streamUrl);
+
+            // EventSource con credenciales
+            // Nota: EventSource no soporta withCredentials directamente,
+            // pero las cookies deberían enviarse automáticamente en mismo origen
+            eventSource = new EventSource(streamUrl);
+
+            eventSource.onopen = () => {
+                console.log('[STREAM-FRONTEND] Conexión SSE establecida');
+                document.getElementById('statusText').textContent = 'Transmisión activa';
+                document.querySelector('#statusBar i').style.color = '#10b981';
+
+                startTime = Date.now();
+                durationInterval = setInterval(updateDuration, 1000);
+                frameCount = 0;
+                lastFpsUpdate = Date.now();
+            };
+
+            eventSource.onmessage = (event) => {
+                console.log('[STREAM-FRONTEND] Mensaje recibido, tamaño:', event.data.length);
+
+                // Handle error messages
+                if (event.data === 'error_unauthorized') {
+                    console.error('[STREAM-FRONTEND] Error de autenticación');
+                    alert('Error de autenticación. Por favor, recarga la página e inicia sesión.');
+                    disconnect();
+                    return;
+                }
+
+                if (event.data === 'inactive' || event.data === 'error') {
+                    console.log('[STREAM-FRONTEND] Estado:', event.data);
+                    return;
+                }
+
+                // Handle stream_stopped message from backend
+                if (event.data === 'stream_stopped') {
+                    console.log('[STREAM-FRONTEND] Stream detenido por servidor');
+                    disconnect();
+                    return;
+                }
+
+                const video = document.getElementById('streamVideo');
+                const placeholder = document.getElementById('placeholder');
+
+                video.src = event.data;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+
+                frameCount++;
+                const now = Date.now();
+                const elapsed = (now - lastFpsUpdate) / 1000;
+
+                if (elapsed >= 1) {
+                    const fps = Math.round(frameCount / elapsed);
+                    document.getElementById('fps').textContent = fps;
+                    frameCount = 0;
+                    lastFpsUpdate = now;
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('[STREAM-FRONTEND] Error en SSE:', error);
+                console.log('[STREAM-FRONTEND] ReadyState:', eventSource.readyState);
+                // ReadyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
+
+                if (eventSource.readyState === 2) {
+                    console.log('[STREAM-FRONTEND] Conexión cerrada');
+                    disconnect();
+                }
+            };
+        }
+
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            if (durationInterval) {
+                clearInterval(durationInterval);
+                durationInterval = null;
+            }
+
+            const video = document.getElementById('streamVideo');
+            const placeholder = document.getElementById('placeholder');
+
+            video.style.display = 'none';
+            video.src = '';
+            placeholder.style.display = 'flex';
+
+            document.getElementById('statusText').textContent = 'Transmisión inactiva';
+            document.querySelector('#statusBar i').style.color = '#ef4444';
+            document.getElementById('fps').textContent = '0';
+            document.getElementById('duration').textContent = '00:00:00';
+
+            frameCount = 0;
+
+            // Update button states
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            startBtn.style.display = 'inline-flex';
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fas fa-play"></i> Iniciar';
+            stopBtn.style.display = 'none';
+            stopBtn.disabled = true;
+        }
+
+        function updateDuration() {
+            if (!startTime) return;
+
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+
+            const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('duration').textContent = formatted;
+        }
+
+        function updateClients() {
+            // Don't interfere with button state during transitions
+            if (isTransitioning) return;
+
+            fetch('/stream/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('clients').textContent = data.clients || 0;
+
+                        const startBtn = document.getElementById('startBtn');
+                        const stopBtn = document.getElementById('stopBtn');
+
+                        if (data.active && !eventSource) {
+                            // Server says active but we're not connected - reconnect
+                            console.log('[STREAM-FRONTEND] Servidor activo, conectando automáticamente...');
+                            connectToStream();
+                            startBtn.style.display = 'none';
+                            stopBtn.style.display = 'inline-flex';
+                            stopBtn.disabled = false;
+                            stopBtn.innerHTML = '<i class="fas fa-stop"></i> Detener';
+                        } else if (!data.active && eventSource) {
+                            // Server says inactive but we're still connected - disconnect
+                            disconnect();
+                        } else if (!data.active && !eventSource) {
+                            // Both agree it's inactive - ensure UI is correct
+                            startBtn.style.display = 'inline-flex';
+                            startBtn.disabled = false;
+                            startBtn.innerHTML = '<i class="fas fa-play"></i> Iniciar';
+                            stopBtn.style.display = 'none';
+                        } else if (data.active && eventSource) {
+                            // Both agree it's active - ensure UI is correct
+                            startBtn.style.display = 'none';
+                            stopBtn.style.display = 'inline-flex';
+                            stopBtn.disabled = false;
+                            stopBtn.innerHTML = '<i class="fas fa-stop"></i> Detener';
+                        }
+                    }
+                });
+        }
+
+        setInterval(updateClients, 5000);
+        updateClients();
+    </script>
+</body>
+</html>
