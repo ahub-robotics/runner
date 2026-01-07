@@ -12,10 +12,9 @@ import sys
 from .config import celery_app
 
 # IMPORTANTE: Importar tasks para registrarlos con Celery
-# TODO: Update these imports when tasks are migrated to new structure
 try:
-    from src import tasks  # noqa: F401
-    from src import streaming_tasks  # noqa: F401
+    from executors import tasks  # noqa: F401
+    from src import streaming_tasks  # noqa: F401  # Will be migrated in FASE 4
 except ImportError:
     # During migration, these may not be available yet
     pass
