@@ -69,12 +69,16 @@ quick_*.md
 CA-INFO.txt
 *.srl
 
-# Build files
-build/
-dist/
+# Build files - PyInstaller temporales
+build/RobotRunner/      # Directorio temporal de PyInstaller
+dist/                   # Ejecutables compilados
 *.egg-info/
 *.egg
 *.spec.backup
+
+# Permitir build/ directory con configs
+!build/
+!build/**
 
 # PyInstaller
 *.manifest
