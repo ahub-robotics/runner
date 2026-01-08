@@ -8,7 +8,10 @@
       "Bash(tree:*)",
       "Bash(find:*)",
       "Bash(wc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []

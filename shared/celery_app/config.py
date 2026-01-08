@@ -42,7 +42,7 @@ celery_app.conf.update(
     task_track_started=True,  # Trackear cuando la tarea inicia
 
     # Result backend
-    result_expires=86400,  # 24 horas
+    result_expires=864000,  # 24 horas
     result_backend_transport_options={
         'master_name': 'mymaster',
         'visibility_timeout': 3600,
