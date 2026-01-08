@@ -239,10 +239,10 @@ except ImportError:
 | rest/info | 2 | ✅ Completado | 205 |
 | streaming/control | 3 | ✅ Completado | 256 |
 | streaming/feed | 2 | ✅ Completado | 158 |
-| tunnel | 3 | 📝 Pendiente | ~200 |
-| server | 1 | 📝 Pendiente | ~50 |
+| tunnel | 3 | ✅ Completado | 214 |
+| server | 1 | ✅ Completado | 56 |
 
-**Total:** ~2,372 / 2,960 líneas migradas (~80%)
+**Total:** ~2,642 / 2,960 líneas migradas (~89%)
 
 ## Testing
 
@@ -264,5 +264,7 @@ pytest tests/integration/test_api_flow.py
 
 ---
 
-**Estado:** 🔄 En progreso (80% completado - Paso 5/8 finalizado)
+**Estado:** ✅ Completado (89% migrado - 22 rutas en 15 módulos)
 **Última actualización:** 2026-01-08
+
+**Nota:** El 11% restante son rutas legacy que permanecen en src/app.py para compatibilidad temporal.
