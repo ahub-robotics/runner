@@ -11,24 +11,13 @@ import threading
 import signal
 from pathlib import Path
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from api import get_server, set_server
 from api.auth import require_auth
 from shared.config.loader import get_config_data, save_config_data
 
 
 # Create blueprint
 web_settings_bp = Blueprint('web_settings', __name__)
-
-
-def get_server():
-    """Get server instance from api module."""
-    from api import get_server
-    return get_server()
-
-
-def set_server(server):
-    """Set server instance in api module."""
-    from api import set_server
-    set_server(server)
 
 
 @web_settings_bp.route('/settings', methods=['GET', 'POST'])

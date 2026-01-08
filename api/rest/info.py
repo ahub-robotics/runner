@@ -8,18 +8,13 @@ Provides server information endpoints:
 import traceback
 from pathlib import Path
 from flask import Blueprint, jsonify, request
+from api import get_server
 from api.auth import require_auth
 from shared.state.redis_state import redis_state
 
 
 # Create blueprint
 rest_info_bp = Blueprint('rest_info', __name__)
-
-
-def get_server():
-    """Get server instance from api module."""
-    from api import get_server
-    return get_server()
 
 
 @rest_info_bp.route('/api/server-info', methods=['GET'])

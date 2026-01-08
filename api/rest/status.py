@@ -6,18 +6,13 @@ Provides status checking endpoints:
     - GET /execution: Get specific execution status
 """
 from flask import Blueprint, jsonify, request
+from api import get_server
 from api.auth import require_token
 from shared.state.redis_state import redis_state
 
 
 # Create blueprint
 rest_status_bp = Blueprint('rest_status', __name__)
-
-
-def get_server():
-    """Get server instance from api module."""
-    from api import get_server
-    return get_server()
 
 
 @rest_status_bp.route('/status', methods=['GET'])

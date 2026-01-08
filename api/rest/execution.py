@@ -14,6 +14,7 @@ import uuid
 import traceback
 from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
+from api import get_server
 from api.auth import require_token
 from api.middleware import REQUEST_LOG_FILE
 from shared.state.redis_state import redis_state
@@ -22,12 +23,6 @@ from shared.celery_app.config import celery_app
 
 # Create blueprint
 rest_execution_bp = Blueprint('rest_execution', __name__)
-
-
-def get_server():
-    """Get server instance from api module."""
-    from api import get_server
-    return get_server()
 
 
 def log_to_file(message):

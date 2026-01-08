@@ -8,18 +8,13 @@ Provides main user interface pages:
 """
 import os
 from flask import Blueprint, redirect, url_for, render_template, request
+from api import get_server
 from api.auth import require_auth
 from shared.config.loader import get_config_data, write_to_config
 
 
 # Create blueprint
 web_ui_bp = Blueprint('web_ui', __name__)
-
-
-def get_server():
-    """Get server instance from api module."""
-    from api import get_server
-    return get_server()
 
 
 @web_ui_bp.route('/', methods=['GET'])

@@ -7,16 +7,11 @@ Provides login/logout functionality for the web interface:
 """
 import time
 from flask import Blueprint, render_template, request, session, redirect, url_for
+from api import get_server
 
 
 # Create blueprint
 web_auth_bp = Blueprint('web_auth', __name__)
-
-
-def get_server():
-    """Get server instance from api module."""
-    from api import get_server
-    return get_server()
 
 
 @web_auth_bp.route('/login', methods=['GET', 'POST'])
