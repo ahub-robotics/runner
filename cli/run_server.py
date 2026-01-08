@@ -110,10 +110,24 @@ def main():
                     __import__(config_module)
                     mod = sys.modules[config_module]
 
-                    # Copiar configuración del módulo
+                    # Configuraciones válidas de Gunicorn (excluir imports y módulos)
+                    import types
+                    valid_config_keys = {
+                        'bind', 'workers', 'threads', 'worker_class', 'timeout',
+                        'graceful_timeout', 'keepalive', 'loglevel', 'accesslog',
+                        'errorlog', 'preload_app', 'certfile', 'keyfile', 'proc_name'
+                    }
+
+                    # Copiar solo configuraciones válidas del módulo
                     for key, value in vars(mod).items():
                         if key.islower() and not key.startswith('_'):
-                            self.cfg.set(key, value)
+                            # Filtrar módulos, funciones y tipos no serializables
+                            if not isinstance(value, (types.ModuleType, types.FunctionType)):
+                                if key in valid_config_keys:
+                                    try:
+                                        self.cfg.set(key, value)
+                                    except Exception:
+                                        pass  # Ignorar errores de configuración inválida
 
                     # Ejecutar hooks si existen
                     if hasattr(mod, 'post_worker_init'):
@@ -122,6 +136,10 @@ def main():
                         self.cfg.set('worker_exit', mod.worker_exit)
                     if hasattr(mod, 'on_exit'):
                         self.cfg.set('on_exit', mod.on_exit)
+                    if hasattr(mod, 'on_starting'):
+                        self.cfg.set('on_starting', mod.on_starting)
+                    if hasattr(mod, 'when_ready'):
+                        self.cfg.set('when_ready', mod.when_ready)
 
                 except ImportError as e:
                     print(f"⚠️  No se pudo cargar gunicorn_config.py: {e}")
