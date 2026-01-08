@@ -1,28 +1,57 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-Robot Runner - Entry Point
+Robot Runner - Main Entry Point
 ================================================================================
 
-Este es el punto de entrada principal de la aplicación Robot Runner.
-Importa y ejecuta la función main() del módulo src.app.
+Punto de entrada principal de la aplicación Robot Runner.
+Delega a los módulos especializados en cli/.
 
 Uso:
-    # Modo normal (GUI + Servidor):
+    # Servidor (modo producción):
     python run.py
 
-    # Modo solo servidor (sin GUI):
-    python run.py --server-only
+    # System tray (modo desarrollo/local):
+    python run.py --tray
 
-    # Con configuración:
-    python run.py --machine_id=ABC123 --license_key=XYZ789
+    # Modo legacy (src.app.main):
+    python run.py --legacy
 
-Para más información, ver docs/FUNCTIONAL-DOCUMENTATION.md
+Nuevos entry points directos:
+    python cli/run_server.py    # Solo servidor
+    python cli/run_tray.py      # Solo system tray
+
+Para más información, ver docs/TECHNICAL-DOCUMENTATION.md
 
 ================================================================================
 """
+import sys
+
+
+def main():
+    """
+    Punto de entrada principal.
+
+    Delega a los módulos especializados según los argumentos.
+    """
+    # Verificar argumentos
+    if '--tray' in sys.argv:
+        # Remover --tray de sys.argv para no confundir al módulo
+        sys.argv.remove('--tray')
+        # Ejecutar system tray
+        from cli.run_tray import main as tray_main
+        tray_main()
+    elif '--legacy' in sys.argv:
+        # Remover --legacy de sys.argv
+        sys.argv.remove('--legacy')
+        # Ejecutar versión legacy (src.app.main)
+        from src.app import main as legacy_main
+        legacy_main()
+    else:
+        # Por defecto: ejecutar servidor
+        from cli.run_server import main as server_main
+        server_main()
+
 
 if __name__ == '__main__':
-    # Importar y ejecutar la aplicación
-    from src.app import main
     main()

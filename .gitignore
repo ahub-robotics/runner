@@ -41,6 +41,23 @@ Thumbs.db
 *.log
 logs/
 
+# Redis
+dump.rdb
+*.rdb
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# Temporary documentation (debug/fix notes)
+*-STREAMING*.md
+*-FIX*.md
+*-READY*.md
+*QUICKSTART*.md
+quick_*.md
+
 # SSL certificates (keep only templates, not actual certificates)
 # Los certificados reales no deben versionarse por seguridad
 # ca-key.pem
@@ -52,12 +69,16 @@ logs/
 CA-INFO.txt
 *.srl
 
-# Build files
-build/
-dist/
+# Build files - PyInstaller temporales
+build/RobotRunner/      # Directorio temporal de PyInstaller
+dist/                   # Ejecutables compilados
 *.egg-info/
 *.egg
 *.spec.backup
+
+# Permitir build/ directory con configs
+!build/
+!build/**
 
 # PyInstaller
 *.manifest
