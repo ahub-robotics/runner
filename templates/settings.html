@@ -255,7 +255,7 @@
                 </div>
             </div>
             <div>
-                <a href="{{ url_for('connected') }}" class="btn btn-secondary">
+                <a href="{{ url_for('web_ui.connected') }}" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Volver al Dashboard
                 </a>
             </div>
@@ -278,7 +278,7 @@
                 <i class="fas fa-cog"></i> Configuración General
             </div>
 
-            <form method="POST" action="{{ url_for('settings') }}">
+            <form method="POST" action="{{ url_for('web_settings.settings') }}">
                 <!-- URL del Orquestador -->
                 <div class="form-group">
                     <label for="url">
@@ -412,7 +412,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Guardar Configuración
                     </button>
-                    <a href="{{ url_for('connected') }}" class="btn btn-secondary">
+                    <a href="{{ url_for('web_ui.connected') }}" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </a>
                 </div>
@@ -443,7 +443,7 @@
 
                 // Enviar por AJAX
                 $.ajax({
-                    url: '{{ url_for("settings") }}',
+                    url: '{{ url_for("web_settings.settings") }}',
                     type: 'POST',
                     data: formData,
                     processData: false,
@@ -463,7 +463,7 @@
                             }, 3000);
                         } else {
                             // Si es redirect HTML normal, seguir el redirect
-                            window.location.href = '{{ url_for("settings") }}';
+                            window.location.href = '{{ url_for("web_settings.settings") }}';
                         }
                     },
                     error: function(xhr, status, error) {

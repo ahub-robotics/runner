@@ -429,10 +429,10 @@
                 </div>
             </div>
             <div class="header-right">
-                <a href="{{ url_for('stream_view') }}" class="btn-settings" target="_blank" title="Abrir vista de streaming">
+                <a href="{{ url_for('streaming_feed.stream_view') }}" class="btn-settings" target="_blank" title="Abrir vista de streaming">
                     <i class="fas fa-tv"></i>
                 </a>
-                <a href="{{ url_for('settings') }}" class="btn-settings">
+                <a href="{{ url_for('web_settings.settings') }}" class="btn-settings">
                     <i class="fas fa-cog"></i> Configuración
                 </a>
                 <div class="status-badge status-{{ server.status }}" id="statusBadge">
