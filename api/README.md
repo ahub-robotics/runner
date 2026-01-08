@@ -237,12 +237,12 @@ except ImportError:
 | rest/status | 2 | ✅ Completado | 150 |
 | rest/execution | 5 | ✅ Completado | 500 |
 | rest/info | 2 | ✅ Completado | 205 |
-| streaming/control | 3 | 📝 Pendiente | ~200 |
-| streaming/feed | 2 | 📝 Pendiente | ~150 |
+| streaming/control | 3 | ✅ Completado | 256 |
+| streaming/feed | 2 | ✅ Completado | 158 |
 | tunnel | 3 | 📝 Pendiente | ~200 |
 | server | 1 | 📝 Pendiente | ~50 |
 
-**Total:** ~1,958 / 2,960 líneas migradas (~66%)
+**Total:** ~2,372 / 2,960 líneas migradas (~80%)
 
 ## Testing
 
@@ -264,5 +264,5 @@ pytest tests/integration/test_api_flow.py
 
 ---
 
-**Estado:** 🔄 En progreso (66% completado - Paso 4/8 finalizado)
+**Estado:** 🔄 En progreso (80% completado - Paso 5/8 finalizado)
 **Última actualización:** 2026-01-08
