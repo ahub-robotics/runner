@@ -232,8 +232,8 @@ except ImportError:
 |--------|-------|--------|--------|
 | Infrastructure | - | ✅ Completado | 644 |
 | web/auth | 2 | ✅ Completado | 95 |
-| web/ui | 3 | 🟡 Parcial | 75 |
-| web/settings | 1 | 📝 Pendiente | ~150 |
+| web/ui | 3 | ✅ Completado | 180 |
+| web/settings | 1 | ✅ Completado | 184 |
 | rest/status | 2 | 📝 Pendiente | ~150 |
 | rest/execution | 5 | 📝 Pendiente | ~500 |
 | rest/info | 2 | 📝 Pendiente | ~200 |
@@ -242,7 +242,7 @@ except ImportError:
 | tunnel | 3 | 📝 Pendiente | ~200 |
 | server | 1 | 📝 Pendiente | ~50 |
 
-**Total:** ~814 / 2,960 líneas migradas (~27%)
+**Total:** ~1,103 / 2,960 líneas migradas (~37%)
 
 ## Testing
 
