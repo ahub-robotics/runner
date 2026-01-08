@@ -45,7 +45,7 @@ class CeleryWorkerThread(threading.Thread):
                 'worker',
                 '--loglevel=info',
                 '--pool=solo',  # CRÍTICO: pool 'solo' para compatibilidad
-                '--concurrency=1',  # 1 tarea a la vez por worker
+                '--concurrency=2',  # 2 tareas concurrentes: ejecución + streaming
                 '--without-heartbeat',  # Sin heartbeat para evitar problemas con threads
                 '--without-gossip',  # Sin gossip para simplificar
                 '--without-mingle',  # Sin mingle para evitar delays

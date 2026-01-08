@@ -27,7 +27,7 @@ celery_app = Celery(
 celery_app.conf.update(
     # Worker configuration
     worker_pool='solo',  # CRÍTICO: Compatible con Windows y Gunicorn threading
-    worker_concurrency=1,  # 1 worker por proceso de Gunicorn
+    worker_concurrency=2,  # 2 tareas concurrentes: ejecución + streaming
 
     # Task configuration
     task_serializer='json',
