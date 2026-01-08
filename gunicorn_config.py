@@ -67,19 +67,70 @@ if not Path(certfile).exists() or not Path(keyfile).exists():
 def post_worker_init(worker):
     """
     Hook ejecutado después de que un worker de Gunicorn se inicializa.
-    
+
     Inicia un thread de Celery worker embebido en cada worker de Gunicorn.
     Esto permite procesar tareas de Celery sin necesidad de un proceso separado.
-    
+
+    Importante: Espera a que Redis esté disponible antes de iniciar Celery.
+
     Args:
         worker: Gunicorn worker instance
     """
+    import time
+    print(f"[GUNICORN] Worker {worker.pid} iniciado")
+
+    # 1. Esperar a que Redis esté disponible (crítico para Celery)
+    print(f"[GUNICORN] Esperando a que Redis esté disponible...")
+    max_attempts = 10
+    for attempt in range(1, max_attempts + 1):
+        try:
+            import redis
+            client = redis.Redis(host='localhost', port=6378, socket_connect_timeout=2)
+            client.ping()
+            print(f"[GUNICORN] ✅ Redis disponible")
+            break
+        except Exception as e:
+            if attempt == max_attempts:
+                print(f"[GUNICORN] ❌ Redis no disponible después de {max_attempts} intentos: {e}")
+                return  # No iniciar Celery si Redis no está disponible
+            print(f"[GUNICORN] ⏳ Redis no disponible (intento {attempt}/{max_attempts}), reintentando...")
+            time.sleep(1)
+
+    # 2. Iniciar Celery worker thread
     try:
         from shared.celery_app.worker import start_celery_worker_thread
-        print(f"[GUNICORN] Worker {worker.pid} iniciado, arrancando Celery worker thread")
+        print(f"[GUNICORN] 🚀 Arrancando Celery worker thread...")
         start_celery_worker_thread()
+        print(f"[GUNICORN] ✅ Celery worker thread iniciado")
     except Exception as e:
         print(f"[GUNICORN] ⚠️  Error iniciando Celery worker thread: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # 3. Inicializar servidor proactivamente (no esperar a primera petición)
+    try:
+        print(f"[GUNICORN] 🔧 Inicializando servidor...")
+        from shared.config.loader import get_config_data
+        from executors.server import Server
+        from api import set_server
+        from shared.state.redis_state import redis_state
+
+        config = get_config_data()
+        server = Server(config)
+        set_server(server)
+
+        # Configurar Redis state con machine_id
+        redis_state.set_machine_id(config['machine_id'])
+
+        # Recuperar ejecuciones huérfanas
+        redis_state.mark_orphaned_executions_as_failed()
+
+        # Establecer estado inicial
+        server.change_status("free", notify_remote=True)
+
+        print(f"[GUNICORN] ✅ Servidor inicializado (machine_id: {config['machine_id']})")
+    except Exception as e:
+        print(f"[GUNICORN] ⚠️  Error inicializando servidor: {e}")
         import traceback
         traceback.print_exc()
 
@@ -109,7 +160,13 @@ def worker_exit(server, worker):
 # ============================================================================
 
 def on_starting(server):
-    """Hook ejecutado antes de que el master process se inicie."""
+    """
+    Hook ejecutado antes de que el master process se inicie.
+
+    Verifica que Redis esté disponible antes de iniciar los workers.
+    """
+    import time
+
     print("=" * 60)
     print("  ROBOT RUNNER - Starting Gunicorn Server")
     print("=" * 60)
@@ -120,6 +177,27 @@ def on_starting(server):
     print(f"  Timeout: {timeout}s")
     print(f"  SSL: {'Enabled' if certfile else 'Disabled'}")
     print("=" * 60)
+
+    # Verificar Redis antes de iniciar workers
+    print("\n[GUNICORN] 🔍 Verificando Redis antes de iniciar workers...")
+    max_attempts = 15
+    for attempt in range(1, max_attempts + 1):
+        try:
+            import redis
+            client = redis.Redis(host='localhost', port=6378, socket_connect_timeout=2)
+            client.ping()
+            print(f"[GUNICORN] ✅ Redis está disponible y listo")
+            break
+        except Exception as e:
+            if attempt == max_attempts:
+                print(f"\n[GUNICORN] ❌ ERROR CRÍTICO: Redis no disponible después de {max_attempts} intentos")
+                print(f"[GUNICORN] Por favor, verifica que Redis esté corriendo en localhost:6378")
+                print(f"[GUNICORN] Detalles: {e}\n")
+                raise RuntimeError("Redis no disponible - no se puede iniciar servidor")
+            print(f"[GUNICORN] ⏳ Redis no responde (intento {attempt}/{max_attempts}), esperando...")
+            time.sleep(2)
+
+    print("[GUNICORN] ✅ Verificación de dependencias completada\n")
 
 
 def on_exit(server):

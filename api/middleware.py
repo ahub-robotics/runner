@@ -23,7 +23,8 @@ def init_server_if_needed(app):
     Esta función se llama antes de cada petición para asegurar que
     el servidor esté disponible incluso cuando Flask se ejecuta como WSGI.
 
-    También configura Redis, recupera ejecuciones huérfanas y establece estado a "free".
+    Nota: Con Gunicorn, el servidor se inicializa en post_worker_init.
+    Esta función es un fallback para desarrollo o WSGI sin Gunicorn.
 
     Args:
         app: Flask application instance
@@ -36,28 +37,38 @@ def init_server_if_needed(app):
     current_server = get_server()
 
     if current_server is None:
-        config = get_config_data()
-        server = Server(config)
+        print("[MIDDLEWARE] 🔧 Servidor no inicializado, inicializando ahora...")
 
-        # Store globally
-        set_server(server)
+        try:
+            config = get_config_data()
+            server = Server(config)
 
-        # Also store in app-level variable for easy access
-        app._server = server
+            # Store globally
+            set_server(server)
 
-        # Configurar Redis state manager con machine_id
-        redis_state.set_machine_id(config['machine_id'])
+            # Also store in app-level variable for easy access
+            app._server = server
 
-        # Recuperar ejecuciones huérfanas (running/paused) y marcarlas como fallidas
-        # Esto es importante para recuperarse de crashes o reinicios del servidor
-        redis_state.mark_orphaned_executions_as_failed()
+            # Configurar Redis state manager con machine_id
+            redis_state.set_machine_id(config['machine_id'])
 
-        # Establecer estado inicial a "free" y notificar al orquestador
-        print("[INIT] Estableciendo estado inicial a 'free'")
-        server.change_status("free", notify_remote=True)
+            # Recuperar ejecuciones huérfanas (running/paused) y marcarlas como fallidas
+            # Esto es importante para recuperarse de crashes o reinicios del servidor
+            redis_state.mark_orphaned_executions_as_failed()
 
-        return server
+            # Establecer estado inicial a "free" y notificar al orquestador
+            print("[MIDDLEWARE] ✅ Estableciendo estado inicial a 'free'")
+            server.change_status("free", notify_remote=True)
 
+            print(f"[MIDDLEWARE] ✅ Servidor inicializado (machine_id: {config['machine_id']})")
+            return server
+        except Exception as e:
+            print(f"[MIDDLEWARE] ❌ Error inicializando servidor: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    # Servidor ya inicializado (probablemente por post_worker_init)
     return current_server
 
 
