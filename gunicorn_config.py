@@ -64,6 +64,90 @@ if not Path(certfile).exists() or not Path(keyfile).exists():
 # CELERY WORKER HOOKS
 # ============================================================================
 
+def _verify_broker_available():
+    """
+    Verifica que el broker de Celery esté disponible.
+
+    Detecta automáticamente si es Redis o RabbitMQ y hace el check apropiado.
+
+    Returns:
+        bool: True si el broker está disponible
+    """
+    import time
+    from shared.celery_app.config import BROKER_URL, BACKEND_TYPE
+
+    print(f"[GUNICORN] 🔍 Verificando broker ({BACKEND_TYPE})...")
+
+    if 'redis' in BROKER_URL:
+        # Redis broker
+        max_attempts = 10
+        for attempt in range(1, max_attempts + 1):
+            try:
+                import redis
+                # Extract host and port from redis URL
+                if '://' in BROKER_URL:
+                    parts = BROKER_URL.split('://')[1].split(':')
+                    host = parts[0]
+                    port = int(parts[1].split('/')[0]) if len(parts) > 1 else 6379
+                else:
+                    host, port = 'localhost', 6379
+
+                client = redis.Redis(host=host, port=port, socket_connect_timeout=2)
+                client.ping()
+                print(f"[GUNICORN] ✅ Redis disponible en {host}:{port}")
+                return True
+            except Exception as e:
+                if attempt == max_attempts:
+                    print(f"[GUNICORN] ❌ Redis no disponible después de {max_attempts} intentos: {e}")
+                    return False
+                print(f"[GUNICORN] ⏳ Redis no responde (intento {attempt}/{max_attempts}), reintentando...")
+                time.sleep(1)
+
+    elif 'amqp' in BROKER_URL:
+        # RabbitMQ broker
+        max_attempts = 10
+        for attempt in range(1, max_attempts + 1):
+            try:
+                import socket
+                # Extract host and port from amqp URL
+                # amqp://guest:guest@localhost:5672//
+                if '://' in BROKER_URL:
+                    parts = BROKER_URL.split('://')[1].split('@')
+                    if len(parts) > 1:
+                        host_port = parts[1].split('/')[0]
+                        if ':' in host_port:
+                            host, port = host_port.split(':')
+                            port = int(port)
+                        else:
+                            host, port = host_port, 5672
+                    else:
+                        host, port = 'localhost', 5672
+                else:
+                    host, port = 'localhost', 5672
+
+                # Test TCP connection to RabbitMQ
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)
+                result = sock.connect_ex((host, port))
+                sock.close()
+
+                if result == 0:
+                    print(f"[GUNICORN] ✅ RabbitMQ disponible en {host}:{port}")
+                    return True
+                else:
+                    raise ConnectionError(f"No se pudo conectar a RabbitMQ en {host}:{port}")
+            except Exception as e:
+                if attempt == max_attempts:
+                    print(f"[GUNICORN] ❌ RabbitMQ no disponible después de {max_attempts} intentos: {e}")
+                    return False
+                print(f"[GUNICORN] ⏳ RabbitMQ no responde (intento {attempt}/{max_attempts}), reintentando...")
+                time.sleep(1)
+
+    else:
+        print(f"[GUNICORN] ⚠️  Broker desconocido: {BROKER_URL}")
+        return True  # Asumir disponible para evitar bloquear startup
+
+
 def post_worker_init(worker):
     """
     Hook ejecutado después de que un worker de Gunicorn se inicializa.
@@ -71,30 +155,17 @@ def post_worker_init(worker):
     Inicia un thread de Celery worker embebido en cada worker de Gunicorn.
     Esto permite procesar tareas de Celery sin necesidad de un proceso separado.
 
-    Importante: Espera a que Redis esté disponible antes de iniciar Celery.
+    Importante: Espera a que el broker esté disponible antes de iniciar Celery.
 
     Args:
         worker: Gunicorn worker instance
     """
-    import time
     print(f"[GUNICORN] Worker {worker.pid} iniciado")
 
-    # 1. Esperar a que Redis esté disponible (crítico para Celery)
-    print(f"[GUNICORN] Esperando a que Redis esté disponible...")
-    max_attempts = 10
-    for attempt in range(1, max_attempts + 1):
-        try:
-            import redis
-            client = redis.Redis(host='localhost', port=6378, socket_connect_timeout=2)
-            client.ping()
-            print(f"[GUNICORN] ✅ Redis disponible")
-            break
-        except Exception as e:
-            if attempt == max_attempts:
-                print(f"[GUNICORN] ❌ Redis no disponible después de {max_attempts} intentos: {e}")
-                return  # No iniciar Celery si Redis no está disponible
-            print(f"[GUNICORN] ⏳ Redis no disponible (intento {attempt}/{max_attempts}), reintentando...")
-            time.sleep(1)
+    # 1. Verificar que el broker esté disponible
+    if not _verify_broker_available():
+        print(f"[GUNICORN] ❌ Broker no disponible - no se inicia Celery worker")
+        return
 
     # 2. Iniciar Celery worker thread
     try:
@@ -113,17 +184,19 @@ def post_worker_init(worker):
         from shared.config.loader import get_config_data
         from executors.server import Server
         from api import set_server
-        from shared.state.redis_state import redis_state
+        from shared.state.state import get_state_manager
+
+        state_manager = get_state_manager()
 
         config = get_config_data()
         server = Server(config)
         set_server(server)
 
-        # Configurar Redis state con machine_id
-        redis_state.set_machine_id(config['machine_id'])
+        # Configurar state manager con machine_id
+        state_manager.set_machine_id(config['machine_id'])
 
         # Recuperar ejecuciones huérfanas
-        redis_state.mark_orphaned_executions_as_failed()
+        state_manager.mark_orphaned_executions_as_failed()
 
         # Establecer estado inicial
         server.change_status("free", notify_remote=True)
@@ -163,9 +236,9 @@ def on_starting(server):
     """
     Hook ejecutado antes de que el master process se inicie.
 
-    Verifica que Redis esté disponible antes de iniciar los workers.
+    Verifica que el broker de Celery esté disponible antes de iniciar los workers.
     """
-    import time
+    from shared.celery_app.config import BACKEND_TYPE
 
     print("=" * 60)
     print("  ROBOT RUNNER - Starting Gunicorn Server")
@@ -176,26 +249,21 @@ def on_starting(server):
     print(f"  Worker class: {worker_class}")
     print(f"  Timeout: {timeout}s")
     print(f"  SSL: {'Enabled' if certfile else 'Disabled'}")
+    print(f"  Celery Backend: {BACKEND_TYPE}")
     print("=" * 60)
 
-    # Verificar Redis antes de iniciar workers
-    print("\n[GUNICORN] 🔍 Verificando Redis antes de iniciar workers...")
-    max_attempts = 15
-    for attempt in range(1, max_attempts + 1):
-        try:
-            import redis
-            client = redis.Redis(host='localhost', port=6378, socket_connect_timeout=2)
-            client.ping()
-            print(f"[GUNICORN] ✅ Redis está disponible y listo")
-            break
-        except Exception as e:
-            if attempt == max_attempts:
-                print(f"\n[GUNICORN] ❌ ERROR CRÍTICO: Redis no disponible después de {max_attempts} intentos")
-                print(f"[GUNICORN] Por favor, verifica que Redis esté corriendo en localhost:6378")
-                print(f"[GUNICORN] Detalles: {e}\n")
-                raise RuntimeError("Redis no disponible - no se puede iniciar servidor")
-            print(f"[GUNICORN] ⏳ Redis no responde (intento {attempt}/{max_attempts}), esperando...")
-            time.sleep(2)
+    # Verificar broker antes de iniciar workers
+    print(f"\n[GUNICORN] 🔍 Verificando broker de Celery ({BACKEND_TYPE})...")
+
+    if not _verify_broker_available():
+        print(f"\n[GUNICORN] ❌ ERROR CRÍTICO: Broker no disponible")
+        print(f"[GUNICORN] Por favor, verifica que el broker esté corriendo")
+        if BACKEND_TYPE == 'redis':
+            print(f"[GUNICORN]   Redis: redis-server --port 6378")
+        elif BACKEND_TYPE == 'rabbitmq+sqlite':
+            print(f"[GUNICORN]   RabbitMQ: rabbitmq-server")
+            print(f"[GUNICORN]   Ver: docs/architecture/windows-architecture.md")
+        raise RuntimeError(f"Broker {BACKEND_TYPE} no disponible - no se puede iniciar servidor")
 
     print("[GUNICORN] ✅ Verificación de dependencias completada\n")
 
