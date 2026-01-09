@@ -441,7 +441,11 @@ class Runner:
 
     def run_robot(self):
         """
-        Create a subprocess that run robot process with the given arguments
+        Create a subprocess that run robot process with the given arguments.
+
+        FASE 1: Setup (venv + dependencies)
+        FASE 2: Callback "actually_started" a iBott Console
+        FASE 3: Ejecución del robot
         """
         self.send_log("Running the process")
         args = {"RobotId": self.robot_id,
@@ -450,22 +454,74 @@ class Runner:
                 "ExecutionId": self.execution_id,
                 'params': self.robot_params}
 
-        if platform.system() == 'Windows':
-            #WINDOWS COMMAND
-            command = [f"py -m venv {self.robot_folder}\\venv",
-                       f"{self.robot_folder}\\venv\\Scripts\\activate",
-                       f"py -m pip install -r \"{self.robot_folder}\\requirements.txt\"",
-                       f"python \"{self.robot_folder}\\main.py\" \"{args}\""]
+        # FASE 1: Setup del entorno (venv + dependencias)
+        # Esto puede tomar 5-10 segundos, por eso lo hacemos ANTES del callback
+        self.send_log("Setting up virtual environment and dependencies")
 
-        else:
-            #UNIX COMMAND
-            command = [f"python3 -m venv {self.robot_folder}/venv",
-                       f"{self.robot_folder}/venv/bin/pip3 install -r {self.robot_folder}/requirements.txt",
-                       f"{self.robot_folder}/venv/bin/python {self.robot_folder}/main.py \"{args}\""]
+        try:
+            if platform.system() == 'Windows':
+                setup_command = [
+                    f"py -m venv {self.robot_folder}\\venv",
+                    f"{self.robot_folder}\\venv\\Scripts\\activate",
+                    f"py -m pip install -q -r \"{self.robot_folder}\\requirements.txt\""
+                ]
+                run_command = f"python \"{self.robot_folder}\\main.py\" \"{args}\""
+            else:
+                setup_command = [
+                    f"python3 -m venv {self.robot_folder}/venv",
+                    f"{self.robot_folder}/venv/bin/pip3 install -q -r {self.robot_folder}/requirements.txt"
+                ]
+                run_command = f"{self.robot_folder}/venv/bin/python {self.robot_folder}/main.py \"{args}\""
 
-        command = " && ".join(command)
+            # Ejecutar setup (puede tomar varios segundos)
+            setup_cmd = " && ".join(setup_command)
+            setup_process = subprocess.run(
+                setup_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minutos máximo para setup
+            )
 
-        self.run_robot_process = subprocess.Popen(command,
+            if setup_process.returncode != 0:
+                error_msg = f"Setup failed: {setup_process.stderr}"
+                self.send_log(error_msg, "syex")
+                raise Exception(error_msg)
+
+            self.send_log("Environment setup completed successfully")
+
+        except subprocess.TimeoutExpired:
+            error_msg = "Setup timeout: Dependencies installation took too long"
+            self.send_log(error_msg, "syex")
+            raise Exception(error_msg)
+        except Exception as e:
+            error_msg = f"Setup error: {str(e)}"
+            self.send_log(error_msg, "syex")
+            raise
+
+        # FASE 2: Callback "actually_started" - El robot VA A INICIAR AHORA
+        # Este es el momento PRECISO para notificar a iBott que el robot está por ejecutar
+        try:
+            self.send_log("Notifying iBott Console: Robot is about to start")
+            endpoint = f'{self.http_protocol}{self.url}/api/executions/{self.execution_id}/set_status/'
+            callback_data = {
+                'status': 'working',
+                'actually_started': True  # Flag especial que indica inicio real
+            }
+            response = requests.put(endpoint, data=callback_data, headers=self.headers, timeout=5)
+
+            if response.status_code == 202:
+                self.send_log("✓ iBott Console notified: Robot actually started")
+            else:
+                # No fatal, pero logear para debugging
+                self.send_log(f"Warning: Callback returned status {response.status_code}", "log")
+        except Exception as e:
+            # El callback no debe bloquear la ejecución
+            self.send_log(f"Warning: Could not send callback to iBott: {e}", "log")
+
+        # FASE 3: Ejecutar el robot
+        self.send_log("Starting robot execution")
+        self.run_robot_process = subprocess.Popen(run_command,
                                                   shell=True,
                                                   bufsize=1,
                                                   stdout=subprocess.PIPE,
