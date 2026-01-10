@@ -34,14 +34,16 @@ def run_robot_task(self, data):
     print(f"[TASK] - Execution ID: {execution_id}")
 
     try:
-        # Importar redis_state aquí para evitar importación circular
-        from shared.state.redis_state import redis_state
+        # Importar state_manager aquí para evitar importación circular
+        from shared.state.state import get_state_manager
+
+        state_manager = get_state_manager()
 
         # IMPORTANTE: NO sobrescribir el estado aquí - ya está establecido desde /run
         # Solo actualizar que la tarea Celery inició (agregar started_at si no existe)
-        existing_state = redis_state.load_execution_state(execution_id)
+        existing_state = state_manager.get_execution_state(execution_id)
         if existing_state and not existing_state.get('started_at'):
-            redis_state.save_execution_state(execution_id, {
+            state_manager.save_execution_state(execution_id, {
                 'started_at': time.time()
             })
 
@@ -75,8 +77,8 @@ def run_robot_task(self, data):
         else:
             final_status = 'failed'
 
-        # Actualizar estado final en Redis
-        redis_state.save_execution_state(execution_id, {
+        # Actualizar estado final en el state backend
+        state_manager.save_execution_state(execution_id, {
             'status': final_status,
             'exit_code': exit_code,
             'finished_at': time.time()
@@ -96,17 +98,18 @@ def run_robot_task(self, data):
         import traceback
         traceback.print_exc()
 
-        # Actualizar estado de error en Redis
+        # Actualizar estado de error en el state backend
         try:
-            from shared.state.redis_state import redis_state
-            redis_state.save_execution_state(execution_id, {
+            from shared.state.state import get_state_manager
+            state_manager = get_state_manager()
+            state_manager.save_execution_state(execution_id, {
                 'status': 'failed',
                 'exit_code': 1,
                 'error': str(e),
                 'finished_at': time.time()
             })
-        except Exception as redis_error:
-            print(f"[TASK] ⚠️  No se pudo actualizar estado de error en Redis: {redis_error}")
+        except Exception as state_error:
+            print(f"[TASK] ⚠️  No se pudo actualizar estado de error en backend: {state_error}")
 
         # Re-raise la excepción para que Celery la marque como fallida
         raise
@@ -115,7 +118,7 @@ def run_robot_task(self, data):
 @celery_app.task(name='executors.tasks.cleanup_old_executions')
 def cleanup_old_executions(max_age_hours=24):
     """
-    Tarea periódica para limpiar ejecuciones antiguas de Redis.
+    Tarea periódica para limpiar ejecuciones antiguas del state backend.
 
     Args:
         max_age_hours: Edad máxima en horas (por defecto 24h)
@@ -124,14 +127,15 @@ def cleanup_old_executions(max_age_hours=24):
         dict: Número de ejecuciones eliminadas
     """
     try:
-        from shared.state.redis_state import redis_state
+        from shared.state.state import get_state_manager
         import time
+
+        state_manager = get_state_manager()
 
         print(f"[CLEANUP] Iniciando limpieza de ejecuciones > {max_age_hours}h")
 
         # Obtener todas las claves de ejecuciones
-        redis_client = redis_state._get_redis_client()
-        execution_keys = redis_client.keys('execution:*')
+        execution_keys = state_manager.keys('execution:*')
 
         # Filtrar solo las claves principales (no :pause_control)
         execution_keys = [k.decode('utf-8') if isinstance(k, bytes) else k
@@ -144,13 +148,14 @@ def cleanup_old_executions(max_age_hours=24):
 
         for key in execution_keys:
             # Obtener información de la ejecución
-            exec_data = redis_client.hgetall(key)
+            exec_data = state_manager.hgetall(key)
 
             if not exec_data:
                 continue
 
             # Decodificar datos
-            exec_data = {k.decode('utf-8'): v.decode('utf-8')
+            exec_data = {k.decode('utf-8') if isinstance(k, bytes) else k:
+                        v.decode('utf-8') if isinstance(v, bytes) else v
                         for k, v in exec_data.items()}
 
             # Verificar edad
@@ -161,8 +166,7 @@ def cleanup_old_executions(max_age_hours=24):
                     if age > max_age_seconds:
                         # Eliminar clave de ejecución y control de pausa
                         execution_id = key.replace('execution:', '')
-                        redis_client.delete(key)
-                        redis_client.delete(f'execution:{execution_id}:pause_control')
+                        state_manager.delete(key, f'execution:{execution_id}:pause_control')
                         deleted_count += 1
                         print(f"[CLEANUP] Eliminada ejecución antigua: {execution_id} (edad: {age/3600:.1f}h)")
                 except (ValueError, TypeError):

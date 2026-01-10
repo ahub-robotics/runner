@@ -4,13 +4,13 @@ Streaming Control Endpoints.
 Provides streaming control endpoints:
     - POST /stream/start: Start screen streaming via Celery task
     - POST /stream/stop: Stop screen streaming
-    - GET /stream/status: Get streaming status from Redis
+    - GET /stream/status: Get streaming status from state backend
 """
 import time
 import traceback
 from flask import Blueprint, jsonify
 from api.auth import require_auth
-from shared.state.redis_state import redis_state
+from shared.state.state import get_state_manager
 from shared.celery_app.config import celery_app
 
 
@@ -37,15 +37,22 @@ def start_streaming():
     print("[STREAM-API] POST /stream/start recibido")
 
     try:
-        # Verificar si ya está activo consultando Redis
-        redis_client = redis_state._get_redis_client()
-        state = redis_client.hgetall('streaming:state')
+        # Verificar si ya está activo consultando el state backend
+        state_manager = get_state_manager()
+        state = state_manager.hgetall('streaming:state')
 
-        print(f"[STREAM-API] Estado actual en Redis: {state}")
+        # Normalizar bytes a strings
+        state_dict = {}
+        for k, v in state.items():
+            k_str = k.decode('utf-8') if isinstance(k, bytes) else k
+            v_str = v.decode('utf-8') if isinstance(v, bytes) else v
+            state_dict[k_str] = v_str
 
-        if state and state.get(b'active') == b'true':
+        print(f"[STREAM-API] Estado actual en backend: {state_dict}")
+
+        if state_dict and state_dict.get('active') == 'true':
             # Verificar si la tarea realmente existe en Celery
-            task_id = state.get(b'task_id', b'').decode('utf-8')
+            task_id = state_dict.get('task_id', '')
             print(f"[STREAM-API] Verificando tarea existente: {task_id}")
 
             try:
@@ -65,13 +72,11 @@ def start_streaming():
                     }), 400
                 else:
                     print(f"[STREAM-API] ⚠️  Estado huérfano detectado (tarea {task_state}), limpiando...")
-                    redis_client.delete('streaming:state')
-                    redis_client.delete('streaming:stop_requested')
+                    state_manager.delete('streaming:state', 'streaming:stop_requested')
                     print("[STREAM-API] Estado huérfano limpiado, continuando con inicio")
             except Exception as e:
                 print(f"[STREAM-API] Error verificando tarea, asumiendo huérfano: {e}")
-                redis_client.delete('streaming:state')
-                redis_client.delete('streaming:stop_requested')
+                state_manager.delete('streaming:state', 'streaming:stop_requested')
 
         # Iniciar tarea de Celery en segundo plano
         print("[STREAM-API] Iniciando tarea de Celery...")
@@ -86,11 +91,11 @@ def start_streaming():
 
         print(f"[STREAM-API] ✅ Tarea de streaming iniciada: {task.id}")
 
-        # Esperar un momento para que se registre en Redis
+        # Esperar un momento para que se registre en el backend
         time.sleep(0.5)
 
         # Verificar que se registró
-        state = redis_client.hgetall('streaming:state')
+        state = state_manager.hgetall('streaming:state')
         print(f"[STREAM-API] Estado después de iniciar: {state}")
 
         return jsonify({
@@ -127,13 +132,20 @@ def stop_streaming():
     print("[STREAM-API] POST /stream/stop recibido")
 
     try:
-        # Verificar si hay streaming activo en Redis
-        redis_client = redis_state._get_redis_client()
-        state = redis_client.hgetall('streaming:state')
+        # Verificar si hay streaming activo en el state backend
+        state_manager = get_state_manager()
+        state = state_manager.hgetall('streaming:state')
 
-        print(f"[STREAM-API] Estado actual en Redis: {state}")
+        # Normalizar bytes a strings
+        state_dict = {}
+        for k, v in state.items():
+            k_str = k.decode('utf-8') if isinstance(k, bytes) else k
+            v_str = v.decode('utf-8') if isinstance(v, bytes) else v
+            state_dict[k_str] = v_str
 
-        if not state or state.get(b'active') != b'true':
+        print(f"[STREAM-API] Estado actual en backend: {state_dict}")
+
+        if not state_dict or state_dict.get('active') != 'true':
             print("[STREAM-API] No hay streaming activo para detener")
             return jsonify({
                 'success': False,
@@ -150,7 +162,7 @@ def stop_streaming():
         # Esperar un momento para verificar
         time.sleep(0.5)
 
-        state = redis_client.hgetall('streaming:state')
+        state = state_manager.hgetall('streaming:state')
         print(f"[STREAM-API] Estado después de detener: {state}")
 
         return jsonify({
@@ -172,7 +184,7 @@ def stop_streaming():
 @require_auth
 def streaming_status():
     """
-    GET /stream/status - Obtiene el estado del streaming desde Redis.
+    GET /stream/status - Obtiene el estado del streaming desde el state backend.
 
     Verifica que la tarea de Celery realmente esté corriendo y limpia estados huérfanos.
 
@@ -191,9 +203,9 @@ def streaming_status():
         }
     """
     try:
-        # Consultar estado desde Redis
-        redis_client = redis_state._get_redis_client()
-        state = redis_client.hgetall('streaming:state')
+        # Consultar estado desde el state backend
+        state_manager = get_state_manager()
+        state = state_manager.hgetall('streaming:state')
 
         if not state:
             return jsonify({
@@ -225,8 +237,7 @@ def streaming_status():
                     # Estados inválidos (huérfanos): PENDING, FAILURE, SUCCESS, REVOKED
                     if task_state not in ['STARTED', 'RETRY']:
                         print(f"[STREAM-STATUS] ⚠️  Estado huérfano detectado (tarea {task_state}), limpiando...")
-                        redis_client.delete('streaming:state')
-                        redis_client.delete('streaming:stop_requested')
+                        state_manager.delete('streaming:state', 'streaming:stop_requested')
 
                         # Retornar como inactivo
                         return jsonify({
@@ -238,8 +249,7 @@ def streaming_status():
                 except Exception as e:
                     print(f"[STREAM-STATUS] Error verificando tarea: {e}")
                     # En caso de error, asumir huérfano y limpiar
-                    redis_client.delete('streaming:state')
-                    redis_client.delete('streaming:stop_requested')
+                    state_manager.delete('streaming:state', 'streaming:stop_requested')
                     return jsonify({
                         'success': True,
                         'active': False,

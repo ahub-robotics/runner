@@ -42,18 +42,84 @@ def main():
     os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
 
     # ========================================================================
-    # VERIFICAR REDIS
+    # VERIFICAR BROKER (Redis o RabbitMQ)
     # ========================================================================
-    print("🔍 Verificando Redis...")
+    print("🔍 Verificando broker de Celery...")
     try:
-        from shared.state.redis_manager import redis_manager
-        redis_manager.ensure_redis_running()
-        print("✅ Redis está listo")
+        from shared.celery_app.config import BROKER_URL, BACKEND_TYPE
+        import time
+
+        print(f"   Tipo de backend: {BACKEND_TYPE}")
+
+        # Detectar tipo de broker y verificar disponibilidad
+        if 'redis' in BROKER_URL:
+            # Redis broker - verificar con redis_manager
+            print("   Broker: Redis")
+            try:
+                from shared.state.redis_manager import redis_manager
+                redis_manager.ensure_redis_running()
+                print("✅ Redis está listo")
+            except Exception as e:
+                print(f"❌ Error con Redis: {e}")
+                print("   Asegúrate de tener Redis instalado:")
+                print("   - macOS: brew install redis && brew services start redis")
+                print("   - Linux: sudo apt-get install redis-server")
+                sys.exit(1)
+
+        elif 'amqp' in BROKER_URL:
+            # RabbitMQ broker - verificar conexión TCP
+            print("   Broker: RabbitMQ")
+            try:
+                import socket
+                # Extract host and port from amqp URL
+                # amqp://guest:guest@localhost:5672//
+                if '://' in BROKER_URL:
+                    parts = BROKER_URL.split('://')[1].split('@')
+                    if len(parts) > 1:
+                        host_port = parts[1].split('/')[0]
+                        if ':' in host_port:
+                            host, port = host_port.split(':')
+                            port = int(port)
+                        else:
+                            host, port = host_port, 5672
+                    else:
+                        host, port = 'localhost', 5672
+                else:
+                    host, port = 'localhost', 5672
+
+                # Test TCP connection to RabbitMQ
+                max_attempts = 5
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock.settimeout(2)
+                        result = sock.connect_ex((host, port))
+                        sock.close()
+
+                        if result == 0:
+                            print(f"✅ RabbitMQ disponible en {host}:{port}")
+                            break
+                        else:
+                            raise ConnectionError(f"No se pudo conectar a RabbitMQ en {host}:{port}")
+                    except Exception as e:
+                        if attempt == max_attempts:
+                            print(f"❌ RabbitMQ no disponible después de {max_attempts} intentos: {e}")
+                            print("   Asegúrate de tener RabbitMQ corriendo:")
+                            print("   - macOS: brew install rabbitmq && brew services start rabbitmq")
+                            print("   - Linux: sudo apt-get install rabbitmq-server")
+                            print("   - Windows: Descargar de https://www.rabbitmq.com/download.html")
+                            sys.exit(1)
+                        print(f"   ⏳ RabbitMQ no responde (intento {attempt}/{max_attempts}), reintentando...")
+                        time.sleep(1)
+            except Exception as e:
+                print(f"❌ Error verificando RabbitMQ: {e}")
+                sys.exit(1)
+        else:
+            print(f"⚠️  Broker desconocido: {BROKER_URL}")
+            print("   Continuando de todas formas...")
+
     except Exception as e:
-        print(f"❌ Error con Redis: {e}")
-        print("   Asegúrate de tener Redis instalado:")
-        print("   - macOS: brew install redis && brew services start redis")
-        print("   - Linux: sudo apt-get install redis-server")
+        print(f"❌ Error verificando broker: {e}")
         sys.exit(1)
 
     # ========================================================================

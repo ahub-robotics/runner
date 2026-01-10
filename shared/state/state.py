@@ -304,6 +304,85 @@ class StateManager:
         except Exception as e:
             print(f"[STATE-MANAGER] ❌ Error marcando ejecuciones huérfanas: {e}")
 
+    # ========================================================================
+    # MÉTODOS GENÉRICOS DE BACKEND (para acceso directo a cualquier clave)
+    # ========================================================================
+
+    def hset(self, key: str, data: Dict) -> None:
+        """
+        Guarda un hash en el backend.
+
+        Args:
+            key: Clave del hash
+            data: Diccionario con los datos
+        """
+        self.backend.hset(key, data)
+
+    def hgetall(self, key: str) -> Dict:
+        """
+        Obtiene todos los campos de un hash.
+
+        Args:
+            key: Clave del hash
+
+        Returns:
+            dict: Datos del hash o dict vacío si no existe
+        """
+        return self.backend.hgetall(key) or {}
+
+    def set(self, key: str, value: str) -> None:
+        """
+        Guarda un valor string en el backend.
+
+        Args:
+            key: Clave
+            value: Valor
+        """
+        self.backend.set(key, value)
+
+    def get(self, key: str) -> Optional[str]:
+        """
+        Obtiene un valor string del backend.
+
+        Args:
+            key: Clave
+
+        Returns:
+            str: Valor o None si no existe
+        """
+        return self.backend.get(key)
+
+    def delete(self, *keys: str) -> None:
+        """
+        Elimina una o más claves del backend.
+
+        Args:
+            keys: Claves a eliminar
+        """
+        for key in keys:
+            self.backend.delete(key)
+
+    def keys(self, pattern: str = '*') -> list:
+        """
+        Busca claves que coincidan con un patrón.
+
+        Args:
+            pattern: Patrón de búsqueda (ej: 'execution:*')
+
+        Returns:
+            list: Lista de claves encontradas
+        """
+        return self.backend.keys(pattern)
+
+    def ping(self) -> bool:
+        """
+        Verifica la conectividad con el backend.
+
+        Returns:
+            bool: True si el backend responde
+        """
+        return self.backend.ping()
+
 
 # Global singleton instance
 _state_manager = None

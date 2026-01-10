@@ -32,20 +32,28 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
     print(f"[STREAMING-TASK] - Config: {fps}fps, quality={quality}")
 
     try:
-        from shared.state.redis_state import redis_state
-        redis_client = redis_state._get_redis_client()
+        from shared.state.state import get_state_manager
+        state_manager = get_state_manager()
 
         # Verificar si ya hay streaming activo
-        state = redis_client.hgetall('streaming:state')
-        if state and state.get(b'active') == b'true':
+        state = state_manager.hgetall('streaming:state')
+
+        # Normalizar bytes a strings
+        state_dict = {}
+        for k, v in state.items():
+            k_str = k.decode('utf-8') if isinstance(k, bytes) else k
+            v_str = v.decode('utf-8') if isinstance(v, bytes) else v
+            state_dict[k_str] = v_str
+
+        if state_dict and state_dict.get('active') == 'true':
             print(f"[STREAMING-TASK] ⚠️  Ya hay streaming activo")
             return {
                 'status': 'already_running',
                 'message': 'Streaming already active'
             }
 
-        # Marcar como activo en Redis
-        redis_client.hset('streaming:state', mapping={
+        # Marcar como activo en el state backend
+        state_manager.hset('streaming:state', {
             'active': 'true',
             'task_id': self.request.id,
             'host': host,
@@ -55,7 +63,7 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
             'started_at': str(time.time())
         })
 
-        print(f"[STREAMING-TASK] ✅ Streaming marcado como activo en Redis")
+        print(f"[STREAMING-TASK] ✅ Streaming marcado como activo en backend")
 
         # Mantener la tarea viva mientras el streaming esté activo
         # Verificar cada segundo si se solicitó detener o si no hay clientes
@@ -66,24 +74,33 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
             time.sleep(1)
 
             # Verificar si se solicitó detener
-            stop_requested = redis_client.get('streaming:stop_requested')
-            if stop_requested and stop_requested.decode('utf-8') == 'true':
-                print(f"[STREAMING-TASK] 🛑 Detención solicitada desde Redis")
-                break
+            stop_requested = state_manager.get('streaming:stop_requested')
+            if stop_requested:
+                stop_str = stop_requested.decode('utf-8') if isinstance(stop_requested, bytes) else stop_requested
+                if stop_str == 'true':
+                    print(f"[STREAMING-TASK] 🛑 Detención solicitada desde backend")
+                    break
 
             # Verificar que el estado siga activo (por si se limpió externamente)
-            state = redis_client.hgetall('streaming:state')
-            if not state or state.get(b'active') != b'true':
+            state = state_manager.hgetall('streaming:state')
+            state_dict = {}
+            for k, v in state.items():
+                k_str = k.decode('utf-8') if isinstance(k, bytes) else k
+                v_str = v.decode('utf-8') if isinstance(v, bytes) else v
+                state_dict[k_str] = v_str
+
+            if not state_dict or state_dict.get('active') != 'true':
                 print(f"[STREAMING-TASK] ⚠️  Estado de streaming ya no está activo")
                 break
 
             # Verificar si hay clientes conectados (via timestamp)
-            last_activity_str = redis_client.get('streaming:last_client_activity')
+            last_activity_str = state_manager.get('streaming:last_client_activity')
 
             if last_activity_str:
                 # Hay actividad registrada - verificar si es reciente
                 try:
-                    last_activity = float(last_activity_str.decode('utf-8'))
+                    last_activity_decoded = last_activity_str.decode('utf-8') if isinstance(last_activity_str, bytes) else last_activity_str
+                    last_activity = float(last_activity_decoded)
                     inactive_time = time.time() - last_activity
 
                     if inactive_time > inactivity_timeout:
@@ -98,9 +115,8 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
                     print(f"[STREAMING-TASK] ⏱️  Sin clientes desde inicio ({int(time_since_start)}s) → auto-stop")
                     break
 
-        # Limpiar estado en Redis
-        redis_client.delete('streaming:state')
-        redis_client.delete('streaming:stop_requested')
+        # Limpiar estado en el backend
+        state_manager.delete('streaming:state', 'streaming:stop_requested')
 
         print(f"[STREAMING-TASK] ✅ Streaming detenido correctamente")
 
@@ -116,10 +132,9 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
 
         # Limpiar en caso de error
         try:
-            from shared.state.redis_state import redis_state
-            redis_client = redis_state._get_redis_client()
-            redis_client.delete('streaming:state')
-            redis_client.delete('streaming:stop_requested')
+            from shared.state.state import get_state_manager
+            state_manager = get_state_manager()
+            state_manager.delete('streaming:state', 'streaming:stop_requested')
         except:
             pass
 
@@ -132,7 +147,7 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
 @celery_app.task(name='streaming.tasks.stop_streaming_task')
 def stop_streaming_task():
     """
-    Detiene el streaming de video enviando señal de detención via Redis.
+    Detiene el streaming de video enviando señal de detención via state backend.
 
     Returns:
         dict: Estado de la operación
@@ -140,20 +155,28 @@ def stop_streaming_task():
     print(f"[STREAMING-TASK] Solicitando detención del streaming")
 
     try:
-        from shared.state.redis_state import redis_state
-        redis_client = redis_state._get_redis_client()
+        from shared.state.state import get_state_manager
+        state_manager = get_state_manager()
 
         # Verificar si hay streaming activo
-        state = redis_client.hgetall('streaming:state')
-        if not state or state.get(b'active') != b'true':
+        state = state_manager.hgetall('streaming:state')
+
+        # Normalizar bytes a strings
+        state_dict = {}
+        for k, v in state.items():
+            k_str = k.decode('utf-8') if isinstance(k, bytes) else k
+            v_str = v.decode('utf-8') if isinstance(v, bytes) else v
+            state_dict[k_str] = v_str
+
+        if not state_dict or state_dict.get('active') != 'true':
             print(f"[STREAMING-TASK] ⚠️  No hay streaming activo")
             return {
                 'status': 'not_running',
                 'message': 'No active streaming to stop'
             }
 
-        # Solicitar detención
-        redis_client.set('streaming:stop_requested', 'true', ex=60)  # TTL 60s
+        # Solicitar detención (sin TTL por ahora - se limpiará cuando la tarea pare)
+        state_manager.set('streaming:stop_requested', 'true')
 
         print(f"[STREAMING-TASK] ✅ Señal de detención enviada")
 
@@ -176,17 +199,17 @@ def stop_streaming_task():
 @celery_app.task(name='streaming.tasks.get_streaming_status')
 def get_streaming_status():
     """
-    Obtiene el estado actual del streaming desde Redis.
+    Obtiene el estado actual del streaming desde el state backend.
 
     Returns:
         dict: Estado del streaming
     """
     try:
-        from shared.state.redis_state import redis_state
-        redis_client = redis_state._get_redis_client()
+        from shared.state.state import get_state_manager
+        state_manager = get_state_manager()
 
-        # Obtener estado desde Redis
-        state = redis_client.hgetall('streaming:state')
+        # Obtener estado desde el backend
+        state = state_manager.hgetall('streaming:state')
 
         if not state:
             return {
