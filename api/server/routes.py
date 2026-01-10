@@ -13,10 +13,10 @@ from api.auth import require_auth
 
 
 # Create blueprint
-server_bp = Blueprint('server', __name__, url_prefix='/server')
+server_mgmt_bp = Blueprint('server_mgmt', __name__, url_prefix='/server')
 
 
-@server_bp.route('/restart', methods=['POST'])
+@server_mgmt_bp.route('/restart', methods=['POST'])
 @require_auth
 def restart_server():
     """
