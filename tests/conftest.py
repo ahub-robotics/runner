@@ -42,7 +42,7 @@ def temp_config_file(test_config, tmp_path):
 
 
 # ============================================================================
-# FIXTURES DE REDIS
+# FIXTURES DE REDIS (Legacy)
 # ============================================================================
 
 @pytest.fixture
@@ -58,6 +58,7 @@ def mock_redis():
     mock.delete.return_value = True
     mock.exists.return_value = False
     mock.keys.return_value = []
+    mock.ping.return_value = True
 
     return mock
 
@@ -67,6 +68,70 @@ def redis_client_mock(mock_redis):
     """Patch del cliente Redis global."""
     with patch('redis.Redis', return_value=mock_redis):
         yield mock_redis
+
+
+# ============================================================================
+# FIXTURES DE STATE BACKEND (Nuevo)
+# ============================================================================
+
+@pytest.fixture
+def mock_state_backend():
+    """Mock de StateBackend abstracto."""
+    mock = MagicMock()
+
+    # Simular operaciones de backend
+    mock.hset.return_value = None
+    mock.hgetall.return_value = {}
+    mock.set.return_value = None
+    mock.get.return_value = None
+    mock.delete.return_value = None
+    mock.keys.return_value = []
+    mock.ping.return_value = True
+    mock.close.return_value = None
+
+    return mock
+
+
+@pytest.fixture
+def mock_state_manager(mock_state_backend):
+    """Mock de StateManager con backend mockeado."""
+    from shared.state.state import StateManager
+
+    # Crear instancia con backend mock
+    manager = StateManager(backend=mock_state_backend)
+    manager.set_machine_id('TEST_MACHINE')
+
+    return manager
+
+
+@pytest.fixture
+def sqlite_test_backend(tmp_path):
+    """SQLite backend real para tests de integración."""
+    from shared.state.backends.sqlite_backend import SQLiteStateBackend
+
+    db_path = tmp_path / 'test_state.db'
+    backend = SQLiteStateBackend(db_path=str(db_path))
+
+    yield backend
+
+    # Cleanup
+    backend.close()
+    if db_path.exists():
+        db_path.unlink()
+
+
+@pytest.fixture
+def state_manager_with_sqlite(sqlite_test_backend):
+    """StateManager con SQLite backend real para tests."""
+    from shared.state.state import StateManager
+
+    manager = StateManager(backend=sqlite_test_backend)
+    manager.set_machine_id('TEST_MACHINE')
+
+    yield manager
+
+    # Cleanup
+    manager.backend.close()
 
 
 # ============================================================================

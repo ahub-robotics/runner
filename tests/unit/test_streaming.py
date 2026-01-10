@@ -220,23 +220,24 @@ class TestCapture:
 class TestStreamingTasks:
     """Tests for Celery streaming tasks."""
 
-    def test_start_streaming_task_success(self, mock_redis):
+    def test_start_streaming_task_success(self, mock_state_backend):
         """Test starting streaming task."""
         from streaming.tasks import start_streaming_task
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state, \
+        with patch('shared.state.state.get_state_manager') as mock_get_manager, \
              patch('time.sleep') as mock_sleep:  # Mock sleep to avoid blocking
 
-            mock_client = MagicMock()
-            mock_client.hgetall.return_value = {}  # No active streaming
-            mock_client.hset.return_value = None
-            mock_redis_state._get_redis_client.return_value = mock_client
+            mock_manager = MagicMock()
+            mock_manager.hgetall.return_value = {}  # No active streaming
+            mock_manager.hset.return_value = None
 
             # Make the loop exit immediately by triggering stop_requested
-            mock_client.get.side_effect = [
+            mock_manager.get.side_effect = [
                 None,  # First check (no stop requested)
-                b'true'  # Second check (stop requested)
+                'true'  # Second check (stop requested)
             ]
+
+            mock_get_manager.return_value = mock_manager
 
             # Call task's run method
             result = start_streaming_task.run(
@@ -248,88 +249,88 @@ class TestStreamingTasks:
 
             assert result['status'] == 'stopped'
             assert 'message' in result
-            mock_client.hset.assert_called()
+            mock_manager.hset.assert_called()
 
-    def test_start_streaming_task_already_running(self, mock_redis):
+    def test_start_streaming_task_already_running(self):
         """Test starting streaming when already active."""
         from streaming.tasks import start_streaming_task
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state:
+        with patch('shared.state.state.get_state_manager') as mock_get_manager:
 
-            mock_client = MagicMock()
+            mock_manager = MagicMock()
             # Simulate active streaming
-            mock_client.hgetall.return_value = {b'active': b'true'}
-            mock_redis_state._get_redis_client.return_value = mock_client
+            mock_manager.hgetall.return_value = {'active': 'true'}
+            mock_get_manager.return_value = mock_manager
 
             result = start_streaming_task.run()
 
             assert result['status'] == 'already_running'
             assert 'message' in result
 
-    def test_start_streaming_task_error(self, mock_redis):
+    def test_start_streaming_task_error(self):
         """Test streaming task error handling."""
         from streaming.tasks import start_streaming_task
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state:
+        with patch('shared.state.state.get_state_manager') as mock_get_manager:
 
-            # Make redis raise exception
-            mock_redis_state._get_redis_client.side_effect = Exception("Redis error")
+            # Make get_state_manager raise exception
+            mock_get_manager.side_effect = Exception("State error")
 
             result = start_streaming_task.run()
 
             assert result['status'] == 'error'
             assert 'message' in result
 
-    def test_stop_streaming_task_success(self, mock_redis):
+    def test_stop_streaming_task_success(self):
         """Test stopping streaming task."""
         from streaming.tasks import stop_streaming_task
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state:
+        with patch('shared.state.state.get_state_manager') as mock_get_manager:
 
-            mock_client = MagicMock()
+            mock_manager = MagicMock()
             # Simulate active streaming
-            mock_client.hgetall.return_value = {b'active': b'true'}
-            mock_client.set.return_value = None
-            mock_redis_state._get_redis_client.return_value = mock_client
+            mock_manager.hgetall.return_value = {'active': 'true'}
+            mock_manager.set.return_value = None
+            mock_get_manager.return_value = mock_manager
 
             result = stop_streaming_task.run()
 
             assert result['status'] == 'stopping'
             assert 'message' in result
-            mock_client.set.assert_called_with('streaming:stop_requested', 'true', ex=60)
+            mock_manager.set.assert_called_with('streaming:stop_requested', 'true')
 
-    def test_stop_streaming_task_not_running(self, mock_redis):
+    def test_stop_streaming_task_not_running(self):
         """Test stopping when no streaming active."""
         from streaming.tasks import stop_streaming_task
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state:
+        with patch('shared.state.state.get_state_manager') as mock_get_manager:
 
-            mock_client = MagicMock()
+            mock_manager = MagicMock()
             # No active streaming
-            mock_client.hgetall.return_value = {}
-            mock_redis_state._get_redis_client.return_value = mock_client
+            mock_manager.hgetall.return_value = {}
+            mock_get_manager.return_value = mock_manager
 
             result = stop_streaming_task.run()
 
             assert result['status'] == 'not_running'
 
-    def test_get_streaming_status_active(self, mock_redis):
+    def test_get_streaming_status_active(self):
         """Test getting status when streaming is active."""
         from streaming.tasks import get_streaming_status
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state:
+        with patch('shared.state.state.get_state_manager') as mock_get_manager:
 
-            mock_client = MagicMock()
-            mock_client.hgetall.return_value = {
-                b'active': b'true',
-                b'task_id': b'task123',
-                b'host': b'0.0.0.0',
-                b'port': b'8765',
-                b'fps': b'15',
-                b'quality': b'50',
-                b'started_at': b'1234567890.0'
+            mock_manager = MagicMock()
+            mock_manager.hgetall.return_value = {
+                'active': 'true',
+                'task_id': 'task123',
+                'host': '0.0.0.0',
+                'port': '8765',
+                'fps': '15',
+                'quality': '50',
+                'started_at': '1234567890.0'
             }
-            mock_redis_state._get_redis_client.return_value = mock_client
+            mock_get_manager.return_value = mock_manager
 
             result = get_streaming_status.run()
 
@@ -339,15 +340,15 @@ class TestStreamingTasks:
             assert result['fps'] == 15
             assert result['quality'] == 50
 
-    def test_get_streaming_status_inactive(self, mock_redis):
+    def test_get_streaming_status_inactive(self):
         """Test getting status when no streaming."""
         from streaming.tasks import get_streaming_status
 
-        with patch('shared.state.redis_state.redis_state') as mock_redis_state:
+        with patch('shared.state.state.get_state_manager') as mock_get_manager:
 
-            mock_client = MagicMock()
-            mock_client.hgetall.return_value = {}
-            mock_redis_state._get_redis_client.return_value = mock_client
+            mock_manager = MagicMock()
+            mock_manager.hgetall.return_value = {}
+            mock_get_manager.return_value = mock_manager
 
             result = get_streaming_status.run()
 
