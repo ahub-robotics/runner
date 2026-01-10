@@ -9,7 +9,7 @@ import time
 import base64
 from flask import Blueprint, Response, render_template
 from api.auth import require_auth, require_auth_sse
-from shared.state.redis_state import redis_state
+from shared.state.state import get_state_manager
 from streaming.streamer import ScreenStreamer
 from shared.config.loader import get_resource_path
 
@@ -48,19 +48,19 @@ def stream_feed():
         try:
             while True:
                 try:
-                    # Verificar estado en Redis
-                    redis_client = redis_state._get_redis_client()
-                    state = redis_client.hgetall('streaming:state')
+                    # Verificar estado en el state backend
+                    state_manager = get_state_manager()
+                    state = state_manager.hgetall('streaming:state')
 
-                    is_active = state and state.get(b'active') == b'true'
+                    is_active = state and state.get('active') == 'true'
 
                     if is_active:
                         # Reset contador si está activo
                         inactive_count = 0
 
-                        # Obtener configuración desde Redis
-                        fps_str = state.get(b'fps', b'15').decode('utf-8')
-                        quality_str = state.get(b'quality', b'75').decode('utf-8')
+                        # Obtener configuración del state backend
+                        fps_str = state.get('fps', '15')
+                        quality_str = state.get('quality', '75')
                         new_fps = int(fps_str)
                         new_quality = int(quality_str)
 
@@ -83,7 +83,7 @@ def stream_feed():
 
                         try:
                             # Actualizar timestamp de actividad de clientes
-                            redis_client.set('streaming:last_client_activity', str(time.time()), ex=60)
+                            state_manager.set('streaming:last_client_activity', str(time.time()))
 
                             # Capturar frame
                             frame_data = local_streamer.capture_screen()

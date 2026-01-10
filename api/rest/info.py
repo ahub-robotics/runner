@@ -10,7 +10,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 from api import get_server
 from api.auth import require_auth
-from shared.state.redis_state import redis_state
+from shared.state.state import get_state_manager
 
 
 # Create blueprint
@@ -50,7 +50,7 @@ def get_server_info():
     # IMPORTANTE: Obtener estado desde Redis para tener el estado real
     # (puede haber tareas de Celery en otros workers)
     try:
-        redis_server_status = redis_state.get_server_status()
+        redis_server_status = get_state_manager().get_server_status()
         if redis_server_status and server:
             # Sincronizar estado local con Redis
             if server.status != redis_server_status:
@@ -85,12 +85,13 @@ def get_server_info():
             'has_active_process': False
         }
 
-    # Buscar ejecución activa en Redis (puede estar en otro worker de Celery)
+    # Buscar ejecución activa en el state backend (puede estar en otro worker de Celery)
     try:
-        # Obtener todas las ejecuciones activas desde Redis
-        import redis
-        client = redis_state._get_redis_client()
-        execution_keys = client.keys('execution:*')
+        # Obtener todas las ejecuciones activas desde el state backend
+        state_manager = get_state_manager()
+
+        # Obtener keys del backend (funciona con Redis y SQLite)
+        execution_keys = state_manager.keys('execution:*')
 
         # Buscar la ejecución que está running o paused
         active_execution = None
@@ -102,15 +103,8 @@ def get_server_info():
                 continue
 
             try:
-                state = client.hgetall(key)
-                if state:
-                    # Convertir bytes a str
-                    state_dict = {}
-                    for k, v in state.items():
-                        k_str = k.decode('utf-8') if isinstance(k, bytes) else k
-                        v_str = v.decode('utf-8') if isinstance(v, bytes) else v
-                        state_dict[k_str] = v_str
-
+                state_dict = state_manager.hgetall(key_str)
+                if state_dict:
                     status = state_dict.get('status', '')
 
                     # Si encontramos una ejecución activa, usarla

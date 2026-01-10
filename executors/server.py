@@ -30,10 +30,10 @@ class Server(Runner):
         self.last_exit_code = None
         self._status_lock = threading.Lock()  # Lock para sincronizar cambios de estado
 
-        # Redis state manager (reemplaza archivo JSON)
-        from shared.state.redis_state import redis_state
-        self.redis_state = redis_state
-        self.redis_state.set_machine_id(self.machine_id)
+        # State manager (funciona con Redis o SQLite según el sistema)
+        from shared.state.state import get_state_manager
+        self.state_manager = get_state_manager()
+        self.state_manager.set_machine_id(self.machine_id)
 
     def change_status(self, new_status, notify_remote=True, execution_id=None):
         """
@@ -66,13 +66,13 @@ class Server(Runner):
             print(f"[STATE] Status: {old_status} → {new_status}")
 
             # Guardar estado en Redis (reemplaza archivo JSON)
-            self.redis_state.set_server_status(new_status)
+            self.state_manager.set_server_status(new_status)
 
             # IMPORTANTE: Solo guardar estado de ejecución cuando cambia a "running"
             # NO sobrescribir estado de ejecución cuando el servidor cambia a "free"
             # (el estado de la ejecución se maneja por separado en tasks.py)
             if execution_id and new_status == "running":
-                self.redis_state.save_execution_state(execution_id, {
+                self.state_manager.save_execution_state(execution_id, {
                     'status': new_status
                 })
 
@@ -111,7 +111,7 @@ class Server(Runner):
 
             # Guardar en Redis (reemplaza archivo JSON)
             if self.execution_id:
-                self.redis_state.save_execution_state(self.execution_id, {
+                self.state_manager.save_execution_state(self.execution_id, {
                     'exit_code': exit_code
                 })
 
@@ -206,11 +206,11 @@ class Server(Runner):
 
         if self.execution_id:
             # Solicitar pausa en Redis (el loop en robot.py lo detectará)
-            self.redis_state.request_pause(self.execution_id)
+            self.state_manager.request_pause(self.execution_id)
 
             # Actualizar estado en Redis
-            self.redis_state.set_server_status("paused")
-            self.redis_state.save_execution_state(self.execution_id, {
+            self.state_manager.set_server_status("paused")
+            self.state_manager.save_execution_state(self.execution_id, {
                 'status': 'paused'
             })
 
@@ -228,11 +228,11 @@ class Server(Runner):
 
         if self.execution_id:
             # Solicitar reanudación en Redis (el loop en robot.py lo detectará)
-            self.redis_state.request_resume(self.execution_id)
+            self.state_manager.request_resume(self.execution_id)
 
             # Actualizar estado en Redis
-            self.redis_state.set_server_status("running")
-            self.redis_state.save_execution_state(self.execution_id, {
+            self.state_manager.set_server_status("running")
+            self.state_manager.save_execution_state(self.execution_id, {
                 'status': 'running'
             })
 

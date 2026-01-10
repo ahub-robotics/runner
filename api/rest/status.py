@@ -8,7 +8,7 @@ Provides status checking endpoints:
 from flask import Blueprint, jsonify, request
 from api import get_server
 from api.auth import require_token
-from shared.state.redis_state import redis_state
+from shared.state.state import get_state_manager
 
 
 # Create blueprint
@@ -111,7 +111,7 @@ def get_execution_status():
         return jsonify({"status": "fail"})
 
     # Consultar estado desde Redis (reemplaza JSON file)
-    state = redis_state.load_execution_state(execution_id)
+    state = get_state_manager().load_execution_state(execution_id)
 
     if not state:
         print(f"[EXECUTION] ❌ Ejecución no encontrada en Redis → fail")

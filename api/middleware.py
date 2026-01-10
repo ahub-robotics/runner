@@ -31,7 +31,7 @@ def init_server_if_needed(app):
     """
     from . import get_server, set_server
     from shared.config.loader import get_config_data
-    from shared.state.redis_state import redis_state
+    from shared.state.state import get_state_manager
     from executors.server import Server
 
     current_server = get_server()
@@ -49,12 +49,13 @@ def init_server_if_needed(app):
             # Also store in app-level variable for easy access
             app._server = server
 
-            # Configurar Redis state manager con machine_id
-            redis_state.set_machine_id(config['machine_id'])
+            # Configurar state manager con machine_id (funciona con Redis o SQLite)
+            state_manager = get_state_manager()
+            state_manager.set_machine_id(config['machine_id'])
 
             # Recuperar ejecuciones huérfanas (running/paused) y marcarlas como fallidas
             # Esto es importante para recuperarse de crashes o reinicios del servidor
-            redis_state.mark_orphaned_executions_as_failed()
+            state_manager.mark_orphaned_executions_as_failed()
 
             # Establecer estado inicial a "free" y notificar al orquestador
             print("[MIDDLEWARE] ✅ Estableciendo estado inicial a 'free'")

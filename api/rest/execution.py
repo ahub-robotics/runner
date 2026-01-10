@@ -17,7 +17,7 @@ from flask import Blueprint, jsonify, request, current_app
 from api import get_server
 from api.auth import require_token
 from api.middleware import REQUEST_LOG_FILE
-from shared.state.redis_state import redis_state
+from shared.state.state import get_state_manager
 from shared.celery_app.config import celery_app
 
 
@@ -183,7 +183,7 @@ def run_robot():
 
         # Guardar estado inicial en Redis (con estado 'running', NO 'pending')
         # IMPORTANTE: No sobrescribir el estado del servidor aquí
-        redis_state.save_execution_state(execution_id, {
+        get_state_manager().save_execution_state(execution_id, {
             'execution_id': execution_id,
             'status': 'running',  # ← CAMBIAR de 'pending' a 'running'
             'task_id': task.id,
@@ -289,7 +289,7 @@ def stop_robot():
         )
 
     # Validar contra Redis (reemplaza JSON file)
-    state = redis_state.load_execution_state(received_execution_id)
+    state = get_state_manager().load_execution_state(received_execution_id)
 
     if not state:
         print(f"[STOP] ❌ Ejecución no encontrada en Redis")
@@ -318,7 +318,7 @@ def stop_robot():
             server.stop()
 
         # Actualizar estado en Redis
-        redis_state.save_execution_state(received_execution_id, {
+        get_state_manager().save_execution_state(received_execution_id, {
             'status': 'failed',
             'exit_code': -1,
             'error': 'Stopped by user',
@@ -389,7 +389,7 @@ def pause_robot():
         )
 
     # Validar contra Redis (reemplaza JSON file)
-    state = redis_state.load_execution_state(received_execution_id)
+    state = get_state_manager().load_execution_state(received_execution_id)
 
     if not state or state.get('status') not in ['running', 'pending']:
         print(f"[PAUSE] ❌ Ejecución no válida para pausar")
@@ -470,7 +470,7 @@ def resume_robot():
         )
 
     # Validar contra Redis (reemplaza JSON file)
-    state = redis_state.load_execution_state(received_execution_id)
+    state = get_state_manager().load_execution_state(received_execution_id)
 
     if not state or state.get('status') != 'paused':
         print(f"[RESUME] ❌ Ejecución no válida para reanudar")
