@@ -34,8 +34,33 @@ def main():
     """
     Punto de entrada del servidor.
 
-    Ejecuta el servidor Flask con Gunicorn en modo producción.
+    Ejecuta el servidor Flask con el servidor apropiado según el sistema operativo:
+    - Linux/macOS: Gunicorn
+    - Windows: Waitress (usando run_server_windows.py)
     """
+    import platform
+
+    # ========================================================================
+    # DETECTAR SISTEMA OPERATIVO
+    # ========================================================================
+    current_os = platform.system()
+
+    if current_os == 'Windows':
+        print("🪟 Windows detectado → Usando Waitress")
+        print("   Nota: Gunicorn no es compatible con Windows")
+        print("   Redirigiendo a cli/run_server_windows.py...")
+        print()
+
+        # Importar y ejecutar versión Windows
+        try:
+            from cli.run_server_windows import main as windows_main
+            windows_main()
+        except ImportError:
+            print("❌ Error: No se pudo importar run_server_windows.py")
+            print("   Ejecutar directamente: python cli/run_server_windows.py")
+            sys.exit(1)
+        return
+
     # ========================================================================
     # FIX PARA macOS: Deshabilitar fork safety check de Objective-C
     # ========================================================================
