@@ -44,7 +44,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 # Importar módulos locales
-from shared.utils.process import find_gunicorn_processes, kill_process
+from shared.utils.process import find_gunicorn_processes, kill_process, find_processes_on_port
 from shared.config.loader import get_config_data
 
 
@@ -67,13 +67,7 @@ class RobotRunnerTray:
         """Verifica el estado inicial del servidor."""
         # Verificar si hay un proceso escuchando en NUESTRO puerto específico
         try:
-            result = subprocess.run(
-                ['lsof', '-t', '-i', f':{self.port}', '-sTCP:LISTEN'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            pids = [int(pid) for pid in result.stdout.strip().split('\n') if pid]
+            pids = find_processes_on_port(self.port)
             self.is_running = len(pids) > 0
 
             # if self.is_running:
@@ -81,7 +75,7 @@ class RobotRunnerTray:
             # else:
             #     print(f"⚠️  No hay servidor corriendo en puerto {self.port}")
 
-        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        except Exception:
             self.is_running = False
             # print(f"⚠️  No se pudo verificar el estado del servidor en puerto {self.port}")
 
@@ -212,18 +206,12 @@ class RobotRunnerTray:
         """Obtiene el texto del estado actual."""
         # Verificar procesos en nuestro puerto específico
         try:
-            result = subprocess.run(
-                ['lsof', '-t', '-i', f':{self.port}', '-sTCP:LISTEN'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            pids = [int(pid) for pid in result.stdout.strip().split('\n') if pid]
+            pids = find_processes_on_port(self.port)
             if pids:
                 return f"✅ Running (PIDs: {', '.join(map(str, pids))})"
             else:
                 return "⛔ Stopped"
-        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        except Exception:
             return "⛔ Stopped"
 
     def start_server(self):
@@ -260,13 +248,7 @@ class RobotRunnerTray:
 
             # Verificar que inició correctamente en NUESTRO puerto
             try:
-                result = subprocess.run(
-                    ['lsof', '-t', '-i', f':{self.port}', '-sTCP:LISTEN'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                pids = [int(pid) for pid in result.stdout.strip().split('\n') if pid]
+                pids = find_processes_on_port(self.port)
 
                 if pids:
                     self.is_running = True
@@ -274,7 +256,7 @@ class RobotRunnerTray:
                 else:
                     print(f"❌ Error: No se detectó servidor en puerto {self.port}")
                     print(f"   Revisa los logs de la terminal o en ~/Robot/requests.log")
-            except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+            except Exception:
                 print("❌ Error al verificar el estado del servidor")
                 self.is_running = False
 
@@ -295,13 +277,7 @@ class RobotRunnerTray:
 
         # Buscar procesos en NUESTRO puerto específico
         try:
-            result = subprocess.run(
-                ['lsof', '-t', '-i', f':{self.port}', '-sTCP:LISTEN'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            pids = [int(pid) for pid in result.stdout.strip().split('\n') if pid]
+            pids = find_processes_on_port(self.port)
 
             if not pids:
                 print(f"⚠️  No se encontraron procesos en puerto {self.port}")
@@ -319,13 +295,7 @@ class RobotRunnerTray:
             time.sleep(2)
 
             # Verificar si quedan procesos en nuestro puerto
-            result = subprocess.run(
-                ['lsof', '-t', '-i', f':{self.port}', '-sTCP:LISTEN'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            remaining = [int(pid) for pid in result.stdout.strip().split('\n') if pid]
+            remaining = find_processes_on_port(self.port)
 
             if remaining:
                 print(f"   Forzando terminación de {len(remaining)} proceso(s)...")
@@ -336,7 +306,7 @@ class RobotRunnerTray:
 
             print(f"✅ Servidor detenido (puerto {self.port})")
 
-        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError) as e:
+        except Exception as e:
             print(f"⚠️  Error al detener servidor: {e}")
 
         # Actualizar estado

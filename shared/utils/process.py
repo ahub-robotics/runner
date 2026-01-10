@@ -3,12 +3,78 @@ Process Management Utilities.
 
 Provides functions for managing server processes:
     - find_gunicorn_processes: Find all running Gunicorn processes
+    - find_processes_on_port: Find processes listening on a specific port (cross-platform)
     - kill_process: Terminate a process gracefully or forcefully
 """
 import os
 import signal
 import subprocess
 import platform
+
+
+def find_processes_on_port(port):
+    """
+    Encuentra procesos escuchando en un puerto específico (multiplataforma).
+
+    Esta función funciona en Windows, Linux y macOS:
+    - Windows: usa netstat
+    - Linux/macOS: usa lsof
+
+    Args:
+        port (int): Puerto a verificar
+
+    Returns:
+        list: Lista de PIDs de procesos escuchando en el puerto
+    """
+    pids = []
+
+    try:
+        if platform.system() == 'Windows':
+            # Windows: usar netstat
+            # netstat -ano muestra todas las conexiones con PIDs
+            result = subprocess.run(
+                ['netstat', '-ano'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            # Buscar líneas que contengan el puerto en LISTENING
+            for line in result.stdout.split('\n'):
+                if f':{port}' in line and 'LISTENING' in line:
+                    # El PID está al final de la línea
+                    parts = line.split()
+                    if parts:
+                        try:
+                            pid = int(parts[-1])
+                            if pid not in pids:
+                                pids.append(pid)
+                        except (ValueError, IndexError):
+                            pass
+
+        else:
+            # Linux/macOS: usar lsof
+            result = subprocess.run(
+                ['lsof', '-t', '-i', f':{port}', '-sTCP:LISTEN'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            for pid_str in result.stdout.strip().split('\n'):
+                if pid_str:
+                    try:
+                        pids.append(int(pid_str))
+                    except ValueError:
+                        pass
+
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        # lsof no existe o timeout
+        pass
+    except Exception as e:
+        print(f"⚠️  Error buscando procesos en puerto {port}: {e}")
+
+    return pids
 
 
 def find_gunicorn_processes():
@@ -77,21 +143,8 @@ def find_gunicorn_processes():
 
             # Método 3: Buscar procesos escuchando en puertos comunes (5001, 5055)
             for port in [5001, 5055]:
-                try:
-                    result = subprocess.run(
-                        ['lsof', '-t', '-i', f':{port}', '-sTCP:LISTEN'],
-                        capture_output=True,
-                        text=True,
-                        timeout=10
-                    )
-                    for pid_str in result.stdout.strip().split('\n'):
-                        if pid_str:
-                            try:
-                                pids.add(int(pid_str))
-                            except ValueError:
-                                pass
-                except (subprocess.TimeoutExpired, FileNotFoundError):
-                    pass
+                port_pids = find_processes_on_port(port)
+                pids.update(port_pids)
 
     except subprocess.TimeoutExpired:
         print(f"⚠️  Timeout buscando procesos")

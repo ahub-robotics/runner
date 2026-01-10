@@ -40,9 +40,22 @@ class CeleryWorkerThread(threading.Thread):
         print(f"[CELERY-WORKER] 🚀 Iniciando worker de Celery en thread: {threading.current_thread().name}")
 
         try:
+            import os
+            import platform
+
+            # Generar hostname único para evitar conflictos de nombre de nodo
+            # Formato: celery@hostname-PID-TID
+            hostname = platform.node()
+            pid = os.getpid()
+            tid = threading.get_ident()
+            unique_hostname = f"{hostname}-{pid}-{tid}"
+
+            print(f"[CELERY-WORKER] 🏷️  Hostname único: celery@{unique_hostname}")
+
             # Argumentos para el worker de Celery
             worker_args = [
                 'worker',
+                f'--hostname=celery@{unique_hostname}',  # Hostname único por worker
                 '--loglevel=info',
                 '--pool=threads',  # CRÍTICO: pool 'threads' para concurrencia real
                 '--concurrency=2',  # 2 tareas concurrentes: ejecución + streaming
