@@ -89,9 +89,15 @@ def configure_flask(app, config=None):
         'FLASK_SECRET_KEY',
         secrets.token_hex(32)
     )
-    
-    # Configuración de cookies seguras (HTTPS-only)
-    app.config['SESSION_COOKIE_SECURE'] = True  # Solo HTTPS
+
+    # Detectar si SSL está configurado
+    ssl_folder = Path.home() / 'Robot' / 'ssl'
+    has_ssl = (ssl_folder / 'cert.pem').exists() and (ssl_folder / 'key.pem').exists()
+
+    # Configuración de cookies seguras
+    # IMPORTANTE: SESSION_COOKIE_SECURE solo funciona con HTTPS
+    # Si no hay SSL, debe ser False para que funcione con HTTP
+    app.config['SESSION_COOKIE_SECURE'] = has_ssl  # True si hay SSL, False si no
     app.config['SESSION_COOKIE_HTTPONLY'] = True  # No accesible desde JavaScript
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Protección CSRF
     
