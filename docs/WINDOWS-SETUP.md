@@ -263,6 +263,7 @@ El servidor mostrará:
 |------------|---------|-------------|
 | **Servidor WSGI** | Waitress | Gunicorn |
 | **Message Broker** | RabbitMQ | Redis |
+| **Celery Result Backend** | RPC (en memoria) | Redis |
 | **State Backend** | SQLite | Redis |
 | **Puerto Broker** | 5672 (AMQP) | 6378 (Redis) |
 | **Management UI** | http://localhost:15672 | N/A |
@@ -272,7 +273,8 @@ El servidor mostrará:
 
 1. **Gunicorn → Waitress**: Gunicorn usa `fork()` que no existe en Windows
 2. **Redis → RabbitMQ**: Redis tiene problemas de rendimiento en Windows
-3. **Redis → SQLite**: SQLite es más eficiente en Windows para estado local
+3. **Celery Backend → RPC**: No requiere SQLAlchemy, resultados en memoria
+4. **State Backend → SQLite**: Para estado persistente de la aplicación
 
 ---
 

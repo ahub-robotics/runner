@@ -2,8 +2,8 @@
 Celery Configuration for Robot Runner
 
 Auto-configures Celery broker and backend based on operating system:
-- Windows: RabbitMQ (broker) + SQLite (backend)
-- Linux/macOS: Redis (broker + backend) with fallback to RabbitMQ+SQLite
+- Windows: RabbitMQ (broker) + RPC backend (resultados en memoria, sin SQLAlchemy)
+- Linux/macOS: Redis (broker + backend) with fallback to RabbitMQ+RPC
 
 Compatible with Windows, Linux y macOS.
 
@@ -12,6 +12,7 @@ Características:
     - Auto-detección de broker/backend basada en OS y disponibilidad
     - Task tracking y acks tardíos para no perder tareas
     - Concurrency de 2 workers para ejecución + streaming simultáneos
+    - RPC backend: No requiere SQLAlchemy, resultados en memoria via RabbitMQ
 """
 from celery import Celery
 import os
@@ -38,7 +39,7 @@ def _get_broker_and_backend():
     system = platform.system()
 
     if system == 'Windows':
-        print(f"[CELERY-CONFIG] 🪟 Windows detectado → RabbitMQ + SQLite")
+        print(f"[CELERY-CONFIG] 🪟 Windows detectado → RabbitMQ + RPC")
         return _get_rabbitmq_config()
 
     # Linux/macOS - try Redis first
@@ -52,7 +53,7 @@ def _get_broker_and_backend():
         print(f"[CELERY-CONFIG] ✅ Redis disponible")
         return _get_redis_config()
     except Exception as e:
-        print(f"[CELERY-CONFIG] ⚠️  Redis no disponible ({e}) → RabbitMQ + SQLite")
+        print(f"[CELERY-CONFIG] ⚠️  Redis no disponible ({e}) → RabbitMQ + RPC")
         return _get_rabbitmq_config()
 
 
@@ -63,25 +64,22 @@ def _get_redis_config():
 
 
 def _get_rabbitmq_config():
-    """Get RabbitMQ + SQLite configuration."""
+    """Get RabbitMQ configuration."""
     # RabbitMQ broker
     rabbitmq_url = os.environ.get(
         'RABBITMQ_URL',
         'amqp://guest:guest@localhost:5672//'
     )
 
-    # SQLite backend for results
-    robot_dir = Path.home() / 'Robot'
-    robot_dir.mkdir(parents=True, exist_ok=True)
-    sqlite_path = robot_dir / 'celery_results.db'
-
-    # Celery SQLAlchemy backend URL
+    # Backend de resultados: usar RPC (en memoria, no requiere SQLAlchemy)
+    # Nota: No almacena resultados persistentemente, pero es suficiente
+    # ya que usamos SQLiteStateBackend para estado real
     backend_url = os.environ.get(
         'CELERY_RESULT_BACKEND',
-        f'db+sqlite:///{sqlite_path}'
+        'rpc://'  # RPC backend - resultados en memoria via RabbitMQ
     )
 
-    return rabbitmq_url, backend_url, 'rabbitmq+sqlite'
+    return rabbitmq_url, backend_url, 'rabbitmq+rpc'
 
 
 # Get configuration
@@ -139,12 +137,10 @@ if BACKEND_TYPE == 'redis':
         'master_name': 'mymaster',
         'visibility_timeout': 3600,
     }
-elif BACKEND_TYPE == 'rabbitmq+sqlite':
-    # SQLite backend settings
-    base_config['database_table_names'] = {
-        'task': 'celery_taskmeta',
-        'group': 'celery_groupmeta',
-    }
+elif BACKEND_TYPE == 'rabbitmq+rpc':
+    # RPC backend settings (results stored in RabbitMQ messages)
+    base_config['result_persistent'] = False  # No persistir resultados en disco
+    base_config['result_expires'] = 3600  # Expirar después de 1 hora
 
 # Apply configuration
 celery_app.conf.update(base_config)
