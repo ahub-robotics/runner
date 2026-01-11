@@ -130,7 +130,11 @@ def find_tunnel_credentials():
 
     if not cloudflared_dir.exists():
         print_error(f"No se encontró directorio: {cloudflared_dir}")
-        print_info("Ejecutar primero: cloudflared tunnel login")
+        print()
+        print_warning("Necesitas autenticarte con Cloudflare primero.")
+        print_info("Ejecuta: cloudflared tunnel login")
+        print_info("Esto abrirá tu navegador para autenticarte.")
+        print()
         return None
 
     print_info(f"Directorio: {cloudflared_dir}")
@@ -140,7 +144,23 @@ def find_tunnel_credentials():
 
     if not cred_files:
         print_error("No se encontraron credenciales de tunnel")
-        print_info("Crear un tunnel con: cloudflared tunnel create <nombre>")
+        print()
+        print_warning("Este servidor necesita las credenciales del tunnel 'robotrunner'.")
+        print()
+        print(f"{Colors.CYAN}Tienes 2 opciones:{Colors.RESET}")
+        print()
+        print(f"{Colors.YELLOW}Opción 1 - Copiar desde otro servidor (RECOMENDADO):{Colors.RESET}")
+        print_info("Si ya tienes el tunnel configurado en otro servidor:")
+        print_info("1. En el otro servidor, busca: ~/.cloudflared/*.json")
+        print_info(f"2. Copia ese archivo a: {cloudflared_dir}")
+        print_info("3. Ejecuta este script de nuevo")
+        print()
+        print(f"{Colors.YELLOW}Opción 2 - Autenticarse y usar tunnel existente:{Colors.RESET}")
+        print_info("1. Ejecuta: cloudflared tunnel login")
+        print_info("2. Luego lista tunnels: cloudflared tunnel list")
+        print_info("3. Descarga credenciales del tunnel 'robotrunner':")
+        print_info("   cloudflared tunnel token robotrunner")
+        print()
         return None
 
     if len(cred_files) == 1:
