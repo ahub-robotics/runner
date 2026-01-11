@@ -122,6 +122,157 @@ def get_cloudflared_dir():
     return Path.home() / '.cloudflared'
 
 
+def create_credentials_from_json(cloudflared_dir):
+    """Crea archivo de credenciales desde contenido JSON pegado."""
+    print()
+    print(f"{Colors.CYAN}📋 Pega el contenido completo del archivo JSON de credenciales:{Colors.RESET}")
+    print_info("Ejemplo: {\"AccountTag\":\"...\",\"TunnelSecret\":\"...\",\"TunnelID\":\"...\",\"Endpoint\":\"\"}")
+    print()
+
+    # Leer input del usuario (puede ser multilínea)
+    print(f"{Colors.GRAY}   (Pega el JSON y presiona Enter):{Colors.RESET}")
+    json_content = input("   ").strip()
+
+    if not json_content:
+        print_error("No se proporcionó contenido")
+        return None
+
+    try:
+        # Validar que sea JSON válido
+        cred_data = json.loads(json_content)
+
+        # Verificar campos requeridos
+        required_fields = ['AccountTag', 'TunnelSecret', 'TunnelID']
+        for field in required_fields:
+            if field not in cred_data:
+                print_error(f"JSON inválido: falta el campo '{field}'")
+                return None
+
+        tunnel_id = cred_data['TunnelID']
+
+        # Crear directorio si no existe
+        cloudflared_dir.mkdir(parents=True, exist_ok=True)
+
+        # Escribir archivo de credenciales
+        cred_file = cloudflared_dir / f'{tunnel_id}.json'
+        cred_file.write_text(json_content, encoding='utf-8')
+
+        print()
+        print_success(f"Credenciales creadas: {cred_file}")
+        print_success(f"Tunnel ID: {tunnel_id}")
+
+        return {
+            'id': tunnel_id,
+            'credentials_file': str(cred_file)
+        }
+
+    except json.JSONDecodeError as e:
+        print_error(f"JSON inválido: {e}")
+        print_info("Asegúrate de copiar el contenido completo del archivo .json")
+        return None
+    except Exception as e:
+        print_error(f"Error al crear credenciales: {e}")
+        return None
+
+
+def load_credentials_from_file(cloudflared_dir):
+    """Carga credenciales desde un archivo existente."""
+    print()
+    print(f"{Colors.CYAN}📁 Ingresa la ruta completa al archivo de credenciales (.json):{Colors.RESET}")
+    print_info("Ejemplo: C:\\temp\\3d7de42c-4a8a-4447-b14f-053cc485ce6b.json")
+    print()
+
+    file_path = input(f"{Colors.CYAN}   Ruta: {Colors.RESET}").strip()
+
+    if not file_path:
+        print_error("No se proporcionó ruta")
+        return None
+
+    try:
+        source_file = Path(file_path)
+
+        if not source_file.exists():
+            print_error(f"Archivo no encontrado: {source_file}")
+            return None
+
+        if not source_file.suffix == '.json':
+            print_error("El archivo debe tener extensión .json")
+            return None
+
+        # Leer y validar el JSON
+        json_content = source_file.read_text(encoding='utf-8')
+        cred_data = json.loads(json_content)
+
+        # Verificar campos requeridos
+        if 'TunnelID' not in cred_data:
+            print_error("JSON inválido: falta el campo 'TunnelID'")
+            return None
+
+        tunnel_id = cred_data['TunnelID']
+
+        # Crear directorio si no existe
+        cloudflared_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copiar archivo
+        dest_file = cloudflared_dir / f'{tunnel_id}.json'
+        dest_file.write_text(json_content, encoding='utf-8')
+
+        print()
+        print_success(f"Credenciales copiadas a: {dest_file}")
+        print_success(f"Tunnel ID: {tunnel_id}")
+
+        return {
+            'id': tunnel_id,
+            'credentials_file': str(dest_file)
+        }
+
+    except json.JSONDecodeError as e:
+        print_error(f"JSON inválido: {e}")
+        return None
+    except Exception as e:
+        print_error(f"Error al cargar credenciales: {e}")
+        return None
+
+
+def authenticate_cloudflare(cloudflared_dir):
+    """Ejecuta cloudflared tunnel login para autenticarse."""
+    print()
+    print_warning("Se abrirá tu navegador para autenticarte con Cloudflare")
+    print()
+
+    response = input(f"{Colors.CYAN}   ¿Continuar? (s/n) [s]: {Colors.RESET}").strip().lower()
+
+    if response and response not in ['s', 'y', 'yes', 'si', 'sí']:
+        print_info("Autenticación cancelada")
+        return None
+
+    try:
+        print()
+        print_info("Ejecutando: cloudflared tunnel login")
+        print_info("Sigue las instrucciones en tu navegador...")
+        print()
+
+        # Ejecutar comando de login
+        result = run_command(['cloudflared', 'tunnel', 'login'], capture=False)
+
+        if result.returncode == 0:
+            print()
+            print_success("Autenticación exitosa")
+            print()
+            print_info("Ahora necesitas las credenciales del tunnel 'robotrunner'")
+            print_info("Ejecuta: cloudflared tunnel list")
+            print_info("Luego busca el tunnel y descarga sus credenciales")
+            print()
+            return None
+        else:
+            print_error("Error en la autenticación")
+            return None
+
+    except Exception as e:
+        print_error(f"Error al autenticar: {e}")
+        return None
+
+
 def find_tunnel_credentials():
     """Encuentra archivos de credenciales de tunnel."""
     print_step(2, "Detectando tunnels...")
@@ -145,22 +296,34 @@ def find_tunnel_credentials():
     if not cred_files:
         print_error("No se encontraron credenciales de tunnel")
         print()
-        print_warning("Este servidor necesita las credenciales del tunnel 'robotrunner'.")
+        print_warning("Este servidor necesita las credenciales del tunnel.")
         print()
-        print(f"{Colors.CYAN}Tienes 2 opciones:{Colors.RESET}")
+        print(f"{Colors.CYAN}Selecciona una opción:{Colors.RESET}")
         print()
-        print(f"{Colors.YELLOW}Opción 1 - Copiar desde otro servidor (RECOMENDADO):{Colors.RESET}")
-        print_info("Si ya tienes el tunnel configurado en otro servidor:")
-        print_info("1. En el otro servidor, busca: ~/.cloudflared/*.json")
-        print_info(f"2. Copia ese archivo a: {cloudflared_dir}")
-        print_info("3. Ejecuta este script de nuevo")
+        print(f"{Colors.YELLOW}[1] Pegar contenido JSON de credenciales (RECOMENDADO){Colors.RESET}")
+        print_info("Si tienes el archivo .json en otro servidor, copia su contenido aquí")
         print()
-        print(f"{Colors.YELLOW}Opción 2 - Autenticarse y usar tunnel existente:{Colors.RESET}")
-        print_info("1. Ejecuta: cloudflared tunnel login")
-        print_info("2. Luego lista tunnels: cloudflared tunnel list")
-        print_info("3. Descarga credenciales del tunnel 'robotrunner':")
-        print_info("   cloudflared tunnel token robotrunner")
+        print(f"{Colors.YELLOW}[2] Proporcionar ruta a archivo de credenciales{Colors.RESET}")
+        print_info("Si ya tienes el archivo .json en este servidor")
         print()
+        print(f"{Colors.YELLOW}[3] Autenticarse con Cloudflare{Colors.RESET}")
+        print_info("Ejecutará: cloudflared tunnel login")
+        print()
+
+        while True:
+            choice = input(f"{Colors.CYAN}   Opción [1]: {Colors.RESET}").strip()
+            if not choice:
+                choice = '1'
+
+            if choice == '1':
+                return create_credentials_from_json(cloudflared_dir)
+            elif choice == '2':
+                return load_credentials_from_file(cloudflared_dir)
+            elif choice == '3':
+                return authenticate_cloudflare(cloudflared_dir)
+            else:
+                print_error("Opción inválida. Ingresa 1, 2 o 3")
+
         return None
 
     if len(cred_files) == 1:
