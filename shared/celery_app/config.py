@@ -46,6 +46,12 @@ def _get_broker_and_backend():
     print(f"[CELERY-CONFIG] 🐧 {system} detectado → Intentando Redis...")
 
     try:
+        # Intentar iniciar Redis automáticamente usando RedisManager
+        from shared.state.redis_manager import redis_manager
+        print(f"[CELERY-CONFIG] 🚀 Intentando iniciar Redis automáticamente...")
+        redis_manager.ensure_redis_running()
+
+        # Verificar que Redis está disponible
         import redis
         redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6378/0')
         client = redis.from_url(redis_url, socket_connect_timeout=2)
@@ -65,6 +71,15 @@ def _get_redis_config():
 
 def _get_rabbitmq_config():
     """Get RabbitMQ configuration."""
+    # Intentar iniciar RabbitMQ automáticamente
+    try:
+        from shared.state.rabbitmq_manager import rabbitmq_manager
+        print(f"[CELERY-CONFIG] 🚀 Intentando iniciar RabbitMQ automáticamente...")
+        rabbitmq_manager.ensure_rabbitmq_running()
+    except Exception as e:
+        print(f"[CELERY-CONFIG] ⚠️  No se pudo iniciar RabbitMQ: {e}")
+        # Continuar de todas formas, puede que esté corriendo en otro host
+
     # RabbitMQ broker
     rabbitmq_url = os.environ.get(
         'RABBITMQ_URL',

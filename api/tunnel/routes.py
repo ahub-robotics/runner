@@ -13,6 +13,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify
 from api.auth import require_auth
 from shared.config.loader import get_config_data
+from shared.utils.process import is_cloudflared_running, find_cloudflared_processes, kill_process
 
 
 # Create blueprint
@@ -52,14 +53,8 @@ def start_tunnel():
                 'message': 'Configuración de túnel no encontrada. Ejecutar setup_machine_tunnel.py primero.'
             }), 400
 
-        # Verificar si ya está corriendo
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
-
-        if result.stdout.strip():
+        # Verificar si ya está corriendo (multiplataforma)
+        if is_cloudflared_running():
             return jsonify({
                 'success': False,
                 'message': 'El túnel ya está activo'
@@ -76,8 +71,10 @@ def start_tunnel():
         subdomain = f"{subdomain_base.lower()}.automatehub.es" if subdomain_base else 'N/A'
 
         # Iniciar túnel en background
+        # En Windows, necesitamos el path completo del ejecutable
+        cloudflared_path = shutil.which('cloudflared')
         subprocess.Popen(
-            ['cloudflared', 'tunnel', 'run', 'robotrunner'],
+            [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
@@ -86,14 +83,8 @@ def start_tunnel():
         # Esperar un momento para verificar que se inició
         time.sleep(2)
 
-        # Verificar que se inició correctamente
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
-
-        if result.stdout.strip():
+        # Verificar que se inició correctamente (multiplataforma)
+        if is_cloudflared_running():
             return jsonify({
                 'success': True,
                 'message': f'Túnel iniciado correctamente',
@@ -129,37 +120,24 @@ def stop_tunnel():
         }
     """
     try:
-        # Buscar procesos de cloudflared
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
+        # Buscar procesos de cloudflared (multiplataforma)
+        pids = find_cloudflared_processes()
 
-        if not result.stdout.strip():
+        if not pids:
             return jsonify({
                 'success': False,
                 'message': 'No hay túneles activos'
             }), 400
 
-        # Obtener los PIDs
-        pids = result.stdout.strip().split('\n')
-
-        # Matar cada proceso
+        # Matar cada proceso (multiplataforma)
         for pid in pids:
-            if pid:
-                subprocess.run(['kill', pid], check=True)
+            kill_process(pid)
 
         return jsonify({
             'success': True,
             'message': 'Túnel detenido correctamente'
         }), 200
 
-    except subprocess.CalledProcessError as e:
-        return jsonify({
-            'success': False,
-            'message': f'Error al detener el túnel: {str(e)}'
-        }), 500
     except Exception as e:
         return jsonify({
             'success': False,
@@ -187,14 +165,8 @@ def tunnel_status():
         }
     """
     try:
-        # Verificar si cloudflared está corriendo
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
-
-        is_active = bool(result.stdout.strip())
+        # Verificar si cloudflared está corriendo (multiplataforma)
+        is_active = is_cloudflared_running()
 
         # Obtener configuración y determinar subdominio
         config = get_config_data()
@@ -215,9 +187,9 @@ def tunnel_status():
         }
 
         if is_active:
-            # Obtener PIDs
-            pids = result.stdout.strip().split('\n')
-            response_data['pids'] = pids
+            # Obtener PIDs (multiplataforma)
+            pids = find_cloudflared_processes()
+            response_data['pids'] = [str(pid) for pid in pids]
 
         return jsonify(response_data), 200
 

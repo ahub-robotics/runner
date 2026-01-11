@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from .loader import get_config_data, write_to_config
+from shared.utils.process import is_cloudflared_running, find_cloudflared_processes, kill_process
 
 
 def get_args(parser, config):
@@ -151,7 +152,7 @@ def check_tunnel_status():
     """
     Check if Cloudflare tunnel is currently running.
 
-    Uses pgrep to find cloudflared processes. Displays:
+    Uses multiplataforma process utilities. Displays:
         - Active status with PIDs
         - Tunnel URL with configured subdomain
         - Instructions if inactive
@@ -161,16 +162,11 @@ def check_tunnel_status():
     print("=" * 60)
 
     try:
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
-
-        if result.stdout.strip():
-            pids = result.stdout.strip().split('\n')
+        # Verificar si está corriendo (multiplataforma)
+        if is_cloudflared_running():
+            pids = find_cloudflared_processes()
             print(f"\n✅ Túnel ACTIVO")
-            print(f"   PIDs: {', '.join(pids)}")
+            print(f"   PIDs: {', '.join([str(pid) for pid in pids])}")
 
             # Get configuration to show subdomain
             config = get_config_data()
@@ -217,21 +213,17 @@ def start_tunnel_cli():
             print("   Ejecutar primero: python run.py --setup-tunnel")
             return
 
-        # Check if already running
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
-
-        if result.stdout.strip():
+        # Check if already running (multiplataforma)
+        if is_cloudflared_running():
             print("⚠️  El túnel ya está activo")
             return
 
         # Start tunnel
         print("🚀 Iniciando túnel...")
+        # En Windows, necesitamos el path completo del ejecutable
+        cloudflared_path = shutil.which('cloudflared')
         subprocess.Popen(
-            ['cloudflared', 'tunnel', 'run', 'robotrunner'],
+            [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
@@ -239,14 +231,8 @@ def start_tunnel_cli():
 
         time.sleep(2)
 
-        # Verify it started
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
-
-        if result.stdout.strip():
+        # Verify it started (multiplataforma)
+        if is_cloudflared_running():
             config = get_config_data()
             subdomain_base = config.get('tunnel_subdomain', '').strip()
             if not subdomain_base:
@@ -267,29 +253,25 @@ def stop_tunnel_cli():
     """
     Stop Cloudflare tunnel from CLI.
 
-    Finds all running cloudflared processes and kills them gracefully.
+    Finds all running cloudflared processes and kills them gracefully (multiplataforma).
     """
     print("\n" + "=" * 60)
     print("  Deteniendo Túnel de Cloudflare")
     print("=" * 60 + "\n")
 
     try:
-        result = subprocess.run(
-            ['pgrep', '-f', 'cloudflared tunnel run'],
-            capture_output=True,
-            text=True
-        )
+        # Buscar procesos de cloudflared (multiplataforma)
+        pids = find_cloudflared_processes()
 
-        if not result.stdout.strip():
+        if not pids:
             print("⚠️  No hay túneles activos")
             return
 
-        pids = result.stdout.strip().split('\n')
-        print(f"🛑 Deteniendo túnel (PIDs: {', '.join(pids)})...")
+        print(f"🛑 Deteniendo túnel (PIDs: {', '.join([str(pid) for pid in pids])})...")
 
+        # Matar cada proceso (multiplataforma)
         for pid in pids:
-            if pid:
-                subprocess.run(['kill', pid], check=True)
+            kill_process(pid)
 
         print("✅ Túnel detenido correctamente")
     except Exception as e:

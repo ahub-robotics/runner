@@ -14,6 +14,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from api import get_server, set_server
 from api.auth import require_auth
 from shared.config.loader import get_config_data, save_config_data
+from shared.utils.process import is_cloudflared_running, find_cloudflared_processes, kill_process
 
 
 # Create blueprint
@@ -81,22 +82,16 @@ def settings():
             port_changed = old_port != new_port
             tunnel_config_changed = subdomain_changed or port_changed
 
-            # Verificar si el túnel está activo antes de hacer cambios
+            # Verificar si el túnel está activo antes de hacer cambios (multiplataforma)
             tunnel_was_active = False
             if tunnel_config_changed:
-                result = subprocess.run(
-                    ['pgrep', '-f', 'cloudflared tunnel run'],
-                    capture_output=True,
-                    text=True
-                )
-                tunnel_was_active = bool(result.stdout.strip())
+                tunnel_was_active = is_cloudflared_running()
 
                 # Si el túnel está activo, detenerlo primero
                 if tunnel_was_active:
-                    pids = result.stdout.strip().split('\n')
+                    pids = find_cloudflared_processes()
                     for pid in pids:
-                        if pid:
-                            subprocess.run(['kill', pid], check=False)
+                        kill_process(pid)
                     time.sleep(1)  # Esperar a que se detenga
 
             # Guardar configuración
@@ -135,13 +130,17 @@ ingress:
 
             # Si el túnel estaba activo, reiniciarlo con la nueva configuración
             if tunnel_was_active:
-                subprocess.Popen(
-                    ['cloudflared', 'tunnel', 'run', 'robotrunner'],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True
-                )
-                time.sleep(2)  # Esperar a que se inicie
+                # En Windows, necesitamos el path completo del ejecutable
+                import shutil
+                cloudflared_path = shutil.which('cloudflared')
+                if cloudflared_path:
+                    subprocess.Popen(
+                        [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True
+                    )
+                    time.sleep(2)  # Esperar a que se inicie
 
             # Actualizar el servidor global con la nueva configuración
             from executors.server import Server

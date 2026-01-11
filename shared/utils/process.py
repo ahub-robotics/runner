@@ -154,6 +154,107 @@ def find_gunicorn_processes():
     return list(pids)
 
 
+def is_cloudflared_running():
+    """
+    Verifica si cloudflared tunnel está corriendo (multiplataforma).
+
+    Esta función funciona en Windows, Linux y macOS:
+    - Windows: usa tasklist
+    - Linux/macOS: usa pgrep
+
+    Returns:
+        bool: True si cloudflared está corriendo, False si no
+    """
+    try:
+        if platform.system() == 'Windows':
+            # Windows: usar tasklist para buscar cloudflared.exe
+            result = subprocess.run(
+                ['tasklist', '/FI', 'IMAGENAME eq cloudflared.exe', '/FO', 'CSV'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            # Verificar si cloudflared aparece en la salida
+            # La salida incluye header y líneas con el proceso
+            lines = result.stdout.strip().split('\n')
+            # Si hay más de 1 línea (header + proceso), cloudflared está corriendo
+            return len(lines) > 1 and 'cloudflared.exe' in result.stdout.lower()
+
+        else:
+            # Linux/macOS: usar pgrep
+            result = subprocess.run(
+                ['pgrep', '-f', 'cloudflared tunnel run'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            # Si pgrep retorna algo, el proceso está corriendo
+            return bool(result.stdout.strip())
+
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        # Comando no existe o timeout - asumir que no está corriendo
+        return False
+    except Exception as e:
+        print(f"⚠️  Error verificando cloudflared: {e}")
+        return False
+
+
+def find_cloudflared_processes():
+    """
+    Encuentra todos los procesos de cloudflared corriendo (multiplataforma).
+
+    Returns:
+        list: Lista de PIDs de procesos de cloudflared
+    """
+    pids = []
+
+    try:
+        if platform.system() == 'Windows':
+            # Windows: usar tasklist
+            result = subprocess.run(
+                ['tasklist', '/FI', 'IMAGENAME eq cloudflared.exe', '/FO', 'CSV'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            # Parsear salida CSV
+            for line in result.stdout.split('\n'):
+                if 'cloudflared.exe' in line.lower():
+                    parts = line.split(',')
+                    if len(parts) >= 2:
+                        pid_str = parts[1].strip('"')
+                        try:
+                            pids.append(int(pid_str))
+                        except ValueError:
+                            pass
+
+        else:
+            # Linux/macOS: usar pgrep
+            result = subprocess.run(
+                ['pgrep', '-f', 'cloudflared'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            for pid_str in result.stdout.strip().split('\n'):
+                if pid_str:
+                    try:
+                        pids.append(int(pid_str))
+                    except ValueError:
+                        pass
+
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    except Exception as e:
+        print(f"⚠️  Error buscando procesos cloudflared: {e}")
+
+    return pids
+
+
 def kill_process(pid, force=False):
     """
     Mata un proceso de forma simple y directa.
