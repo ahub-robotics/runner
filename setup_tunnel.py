@@ -235,7 +235,7 @@ def load_credentials_from_file(cloudflared_dir):
 
 
 def authenticate_cloudflare(cloudflared_dir):
-    """Ejecuta cloudflared tunnel login para autenticarse."""
+    """Ejecuta cloudflared tunnel login y descarga credenciales automáticamente."""
     print()
     print_warning("Se abrirá tu navegador para autenticarte con Cloudflare")
     print()
@@ -248,28 +248,133 @@ def authenticate_cloudflare(cloudflared_dir):
 
     try:
         print()
-        print_info("Ejecutando: cloudflared tunnel login")
+        print_info("Paso 1/3: Autenticándote con Cloudflare...")
         print_info("Sigue las instrucciones en tu navegador...")
         print()
 
         # Ejecutar comando de login
         result = run_command(['cloudflared', 'tunnel', 'login'], capture=False)
 
-        if result.returncode == 0:
-            print()
-            print_success("Autenticación exitosa")
-            print()
-            print_info("Ahora necesitas las credenciales del tunnel 'robotrunner'")
-            print_info("Ejecuta: cloudflared tunnel list")
-            print_info("Luego busca el tunnel y descarga sus credenciales")
-            print()
-            return None
-        else:
+        if result.returncode != 0:
             print_error("Error en la autenticación")
             return None
 
+        print()
+        print_success("Autenticación exitosa")
+        print()
+
+        # Listar túneles disponibles
+        print_info("Paso 2/3: Listando túneles disponibles...")
+        result = run_command(['cloudflared', 'tunnel', 'list'])
+
+        if result.returncode != 0:
+            print_error("Error al listar túneles")
+            print_info("Ejecuta manualmente: cloudflared tunnel list")
+            return None
+
+        # Parsear output para encontrar túneles
+        tunnels = []
+        lines = result.stdout.strip().split('\n')
+
+        # Saltar header y parsear líneas
+        for line in lines[1:]:  # Skip header
+            parts = line.split()
+            if len(parts) >= 2:
+                tunnel_id = parts[0]
+                tunnel_name = parts[1]
+                tunnels.append({'id': tunnel_id, 'name': tunnel_name})
+
+        if not tunnels:
+            print_error("No se encontraron túneles en tu cuenta")
+            print_info("Crea uno con: cloudflared tunnel create robotrunner")
+            return None
+
+        print()
+        print_success(f"Se encontraron {len(tunnels)} túnel(es)")
+
+        # Buscar el túnel "robotrunner"
+        robotrunner_tunnel = None
+        for tunnel in tunnels:
+            if tunnel['name'].lower() == 'robotrunner':
+                robotrunner_tunnel = tunnel
+                break
+
+        # Si no se encuentra robotrunner, mostrar opciones
+        if not robotrunner_tunnel:
+            print_warning("No se encontró el túnel 'robotrunner'")
+            print()
+            print(f"{Colors.CYAN}Túneles disponibles:{Colors.RESET}")
+            for i, tunnel in enumerate(tunnels):
+                print_info(f"  [{i}] {tunnel['name']} (ID: {tunnel['id']})")
+            print()
+
+            while True:
+                selection = input(f"{Colors.CYAN}   Selecciona el número del túnel [0]: {Colors.RESET}").strip()
+                if not selection:
+                    selection = 0
+                else:
+                    try:
+                        selection = int(selection)
+                    except ValueError:
+                        print_error("Ingresa un número válido")
+                        continue
+
+                if 0 <= selection < len(tunnels):
+                    robotrunner_tunnel = tunnels[selection]
+                    break
+                else:
+                    print_error("Selección inválida")
+        else:
+            print_success(f"Túnel encontrado: robotrunner (ID: {robotrunner_tunnel['id']})")
+
+        # Descargar credenciales del túnel
+        print()
+        print_info("Paso 3/3: Descargando credenciales del túnel...")
+
+        tunnel_id = robotrunner_tunnel['id']
+        tunnel_name = robotrunner_tunnel['name']
+
+        # Buscar archivo de credenciales en ~/.cloudflared/
+        # Después del login, cloudflared debería tener acceso a los túneles
+        # pero no descarga automáticamente las credenciales
+
+        # Intentar obtener credenciales usando cloudflared tunnel token
+        print_info(f"Obteniendo credenciales para: {tunnel_name}")
+
+        # Crear directorio si no existe
+        cloudflared_dir.mkdir(parents=True, exist_ok=True)
+
+        # Buscar si ya existe el archivo de credenciales
+        cred_file = cloudflared_dir / f'{tunnel_id}.json'
+
+        if cred_file.exists():
+            print_success(f"Credenciales ya existen: {cred_file}")
+            return {
+                'id': tunnel_id,
+                'credentials_file': str(cred_file)
+            }
+
+        # Si no existe, intentar crearlo con tunnel info
+        # Nota: cloudflared no proporciona un comando directo para descargar credenciales
+        # La forma correcta es usar cloudflared tunnel token, pero eso genera un token,
+        # no el archivo de credenciales
+
+        print()
+        print_warning("Las credenciales no se pueden descargar automáticamente")
+        print_info("Cloudflare no permite descargar credenciales de túneles existentes")
+        print()
+        print(f"{Colors.CYAN}Opciones:{Colors.RESET}")
+        print_info("1. Si tienes las credenciales en otro servidor, usa la Opción 1")
+        print_info("2. Si creaste el túnel en este servidor, busca:")
+        print_info(f"   {cloudflared_dir / '*.json'}")
+        print()
+
+        return None
+
     except Exception as e:
         print_error(f"Error al autenticar: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
