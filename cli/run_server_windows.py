@@ -161,33 +161,55 @@ def main():
     # ========================================================================
     # EJECUTAR WAITRESS
     # ========================================================================
-    print("\n" + "="*70)
-    print("🚀 Iniciando Robot Runner Server (Windows)...")
-    print("="*70)
-    print(f"📍 Port: {port}")
-    print(f"🔑 Machine ID: {machine_id}")
-    print(f"🌐 URL: http://0.0.0.0:{port}")
-    print(f"🖥️  Servidor: Waitress (compatible Windows)")
-    print("="*70 + "\n")
 
     try:
         from waitress import serve
         from api.app import create_app
+        import socket
 
         # Crear aplicación Flask
         flask_app = create_app()
 
-        # Configurar SSL si está disponible
+        # Detectar SSL antes de mostrar URLs
         ssl_folder = Path.home() / 'Robot' / 'ssl'
         cert_file = ssl_folder / 'cert.pem'
         key_file = ssl_folder / 'key.pem'
+        ssl_enabled = cert_file.exists() and key_file.exists()
+        protocol = 'https' if ssl_enabled else 'http'
 
-        if cert_file.exists() and key_file.exists():
-            print(f"🔒 SSL habilitado")
+        # Obtener IP local
+        local_ip = '127.0.0.1'
+        try:
+            # Truco para obtener la IP local sin realmente conectarse
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except:
+            local_ip = '127.0.0.1'
+
+        # Mostrar información de inicio
+        print("\n" + "="*70)
+        print("🚀 Iniciando Robot Runner Server (Windows)...")
+        print("="*70)
+        print(f"📍 Port: {port}")
+        print(f"🔑 Machine ID: {machine_id}")
+        print(f"🖥️  Servidor: Waitress (compatible Windows)")
+
+        if ssl_enabled:
+            print(f"🔒 SSL: Habilitado")
             print(f"   Certificado: {cert_file}")
             print(f"   Clave: {key_file}")
-            print()
+        else:
+            print(f"🔓 SSL: No configurado")
 
+        print("\n🌐 URLs de acceso:")
+        print(f"   • Local:    {protocol}://localhost:{port}")
+        print(f"   • Red:      {protocol}://{local_ip}:{port}")
+        print("="*70 + "\n")
+
+        # Configurar y ejecutar Waitress
+        if ssl_enabled:
             # Waitress con SSL
             serve(
                 flask_app,
@@ -199,10 +221,6 @@ def main():
                 ident='RobotRunner-Waitress/1.0'
             )
         else:
-            print(f"⚠️  SSL no configurado (opcional)")
-            print(f"   Para habilitar SSL, crear certificados en: {ssl_folder}")
-            print()
-
             # Waitress sin SSL
             serve(
                 flask_app,
