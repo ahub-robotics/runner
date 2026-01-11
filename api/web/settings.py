@@ -15,6 +15,7 @@ from api import get_server, set_server
 from api.auth import require_auth
 from shared.config.loader import get_config_data, save_config_data
 from shared.utils.process import is_cloudflared_running, find_cloudflared_processes, kill_process
+from shared.utils.tunnel import get_tunnel_hostname
 
 
 # Create blueprint
@@ -54,9 +55,7 @@ def settings():
         try:
             # Obtener configuración actual para comparar cambios
             old_config = get_config_data()
-            old_subdomain = old_config.get('tunnel_subdomain', '').strip()
-            if not old_subdomain:
-                old_subdomain = old_config.get('machine_id', '').strip()
+            old_hostname = get_tunnel_hostname(old_config)
             old_port = str(old_config.get('port', '5055'))
 
             # Obtener datos del formulario
@@ -71,16 +70,14 @@ def settings():
                 'tunnel_id': request.form.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b')
             }
 
-            # Determinar nuevo subdominio
-            new_subdomain = new_config.get('tunnel_subdomain', '').strip()
-            if not new_subdomain:
-                new_subdomain = new_config.get('machine_id', '').strip()
+            # Determinar nuevo hostname del túnel
+            new_hostname = get_tunnel_hostname(new_config)
             new_port = str(new_config.get('port', '5055'))
 
-            # Verificar si cambió el subdominio o el puerto
-            subdomain_changed = old_subdomain.lower() != new_subdomain.lower()
+            # Verificar si cambió el hostname o el puerto
+            hostname_changed = old_hostname.lower() != new_hostname.lower()
             port_changed = old_port != new_port
-            tunnel_config_changed = subdomain_changed or port_changed
+            tunnel_config_changed = hostname_changed or port_changed
 
             # Verificar si el túnel está activo antes de hacer cambios (multiplataforma)
             tunnel_was_active = False
@@ -97,8 +94,8 @@ def settings():
             # Guardar configuración
             save_config_data(new_config)
 
-            # Actualizar configuración de Cloudflare
-            hostname = f"{new_subdomain.lower()}.automatehub.es"
+            # Usar el hostname ya calculado
+            hostname = new_hostname
 
             # Actualizar archivo de configuración de Cloudflare
             cloudflare_config_path = Path.home() / '.cloudflared' / 'config.yml'

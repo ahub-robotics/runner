@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify
 from api.auth import require_auth
 from shared.config.loader import get_config_data
 from shared.utils.process import is_cloudflared_running, find_cloudflared_processes, kill_process
+from shared.utils.tunnel import get_tunnel_hostname
 
 
 # Create blueprint
@@ -88,15 +89,9 @@ def start_tunnel():
                 'message': 'El túnel ya está activo'
             }), 400
 
-        # Obtener configuración y determinar subdominio
+        # Obtener configuración y determinar hostname del túnel
         config = get_config_data()
-
-        # Usar tunnel_subdomain si está configurado, si no usar machine_id
-        subdomain_base = config.get('tunnel_subdomain', '').strip()
-        if not subdomain_base:
-            subdomain_base = config.get('machine_id', '').strip()
-
-        subdomain = f"{subdomain_base.lower()}.automatehub.es" if subdomain_base else 'N/A'
+        hostname = get_tunnel_hostname(config)
 
         # Iniciar túnel en background
         # En Windows, necesitamos el path completo del ejecutable
@@ -133,8 +128,8 @@ def start_tunnel():
                 return jsonify({
                     'success': True,
                     'message': f'Túnel iniciado correctamente',
-                    'subdomain': subdomain,
-                    'url': f'https://{subdomain}'
+                    'subdomain': hostname,
+                    'url': f'https://{hostname}'
                 }), 200
             else:
                 print(f"[TUNNEL-START] ❌ Túnel no está corriendo después de iniciar")
@@ -235,21 +230,15 @@ def tunnel_status():
             is_active = False
             pids = []
 
-        # Obtener configuración y determinar subdominio
+        # Obtener configuración y determinar hostname del túnel
         config = get_config_data()
-
-        # Usar tunnel_subdomain si está configurado, si no usar machine_id
-        subdomain_base = config.get('tunnel_subdomain', '').strip()
-        if not subdomain_base:
-            subdomain_base = config.get('machine_id', '').strip()
-
-        subdomain = f"{subdomain_base.lower()}.automatehub.es" if subdomain_base else 'N/A'
+        hostname = get_tunnel_hostname(config)
 
         response_data = {
             'success': True,
             'active': is_active,
-            'subdomain': subdomain,
-            'url': f'https://{subdomain}' if is_active else None,
+            'subdomain': hostname,
+            'url': f'https://{hostname}' if is_active else None,
             'machine_id': config.get('machine_id', '')
         }
 

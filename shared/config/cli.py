@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .loader import get_config_data, write_to_config
 from shared.utils.process import is_cloudflared_running, find_cloudflared_processes, kill_process
+from shared.utils.tunnel import get_tunnel_hostname
 
 
 def get_args(parser, config):
@@ -139,11 +140,8 @@ def show_config(config):
     print(f"\n📁 Robots:")
     print(f"  Directorio:       {config.get('folder', 'N/A')}")
     print(f"\n🌐 Túnel Cloudflare:")
-    subdomain_base = config.get('tunnel_subdomain', '').strip()
-    if not subdomain_base:
-        subdomain_base = config.get('machine_id', '').strip()
-    subdomain = f"{subdomain_base.lower()}.automatehub.es" if subdomain_base else 'N/A'
-    print(f"  Subdominio:       {subdomain}")
+    hostname = get_tunnel_hostname(config)
+    print(f"  Subdominio:       {hostname}")
     print(f"  Tunnel ID:        {config.get('tunnel_id', 'N/A')}")
     print("\n" + "=" * 60 + "\n")
 
@@ -168,13 +166,10 @@ def check_tunnel_status():
             print(f"\n✅ Túnel ACTIVO")
             print(f"   PIDs: {', '.join([str(pid) for pid in pids])}")
 
-            # Get configuration to show subdomain
+            # Get configuration to show hostname
             config = get_config_data()
-            subdomain_base = config.get('tunnel_subdomain', '').strip()
-            if not subdomain_base:
-                subdomain_base = config.get('machine_id', '').strip()
-            subdomain = f"{subdomain_base.lower()}.automatehub.es" if subdomain_base else 'N/A'
-            print(f"   URL: https://{subdomain}")
+            hostname = get_tunnel_hostname(config)
+            print(f"   URL: https://{hostname}")
         else:
             print(f"\n❌ Túnel INACTIVO")
             print(f"   Ejecuta: python run.py --start-tunnel")
@@ -234,13 +229,10 @@ def start_tunnel_cli():
         # Verify it started (multiplataforma)
         if is_cloudflared_running():
             config = get_config_data()
-            subdomain_base = config.get('tunnel_subdomain', '').strip()
-            if not subdomain_base:
-                subdomain_base = config.get('machine_id', '').strip()
-            subdomain = f"{subdomain_base.lower()}.automatehub.es" if subdomain_base else 'N/A'
+            hostname = get_tunnel_hostname(config)
 
             print("✅ Túnel iniciado correctamente")
-            print(f"   URL: https://{subdomain}")
+            print(f"   URL: https://{hostname}")
         else:
             print("❌ Error al iniciar el túnel")
     except Exception as e:
@@ -315,8 +307,7 @@ def setup_tunnel_cli(config):
             return
 
         tunnel_id = config.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b')
-        subdomain_base = (config.get('tunnel_subdomain') or machine_id).strip()
-        hostname = f"{subdomain_base.lower()}.automatehub.es"
+        hostname = get_tunnel_hostname(config)
         port = config.get('port', '5055')
 
         print(f"📋 Configurando túnel:")
