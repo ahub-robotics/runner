@@ -50,7 +50,35 @@ def start_tunnel():
         if not cloudflare_config.exists():
             return jsonify({
                 'success': False,
-                'message': 'Configuración de túnel no encontrada. Ejecutar setup_machine_tunnel.py primero.'
+                'message': 'Configuración de túnel no encontrada. Ejecutar: python setup_tunnel.py'
+            }), 400
+
+        # Leer y verificar el config.yml
+        try:
+            config_content = cloudflare_config.read_text()
+            print(f"[TUNNEL-START] Config encontrado en: {cloudflare_config}")
+
+            # Verificar que el archivo de credenciales existe
+            import re
+            credentials_match = re.search(r'credentials-file:\s*(.+)', config_content)
+            if credentials_match:
+                credentials_path = Path(credentials_match.group(1).strip())
+                if not credentials_path.exists():
+                    return jsonify({
+                        'success': False,
+                        'message': f'Archivo de credenciales no encontrado: {credentials_path}. Ejecutar: python setup_tunnel.py'
+                    }), 400
+                print(f"[TUNNEL-START] Credenciales encontradas en: {credentials_path}")
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Config inválido: falta credentials-file. Ejecutar: python setup_tunnel.py'
+                }), 400
+        except Exception as config_error:
+            print(f"[TUNNEL-START] Error leyendo config: {config_error}")
+            return jsonify({
+                'success': False,
+                'message': f'Error en configuración: {str(config_error)}'
             }), 400
 
         # Verificar si ya está corriendo (multiplataforma)
