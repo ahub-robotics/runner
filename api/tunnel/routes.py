@@ -73,28 +73,55 @@ def start_tunnel():
         # Iniciar túnel en background
         # En Windows, necesitamos el path completo del ejecutable
         cloudflared_path = shutil.which('cloudflared')
-        subprocess.Popen(
-            [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
 
-        # Esperar un momento para verificar que se inició
-        time.sleep(2)
+        print(f"[TUNNEL-START] Iniciando cloudflared desde: {cloudflared_path}")
+        print(f"[TUNNEL-START] Comando: {cloudflared_path} tunnel run robotrunner")
 
-        # Verificar que se inició correctamente (multiplataforma)
-        if is_cloudflared_running():
-            return jsonify({
-                'success': True,
-                'message': f'Túnel iniciado correctamente',
-                'subdomain': subdomain,
-                'url': f'https://{subdomain}'
-            }), 200
-        else:
+        # Capturar salida para debugging
+        import tempfile
+        log_file = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.log')
+
+        try:
+            process = subprocess.Popen(
+                [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                start_new_session=True
+            )
+
+            print(f"[TUNNEL-START] Proceso iniciado con PID: {process.pid}")
+
+            # Esperar un momento para verificar que se inició
+            time.sleep(3)
+
+            # Leer logs si el proceso falló
+            log_file.seek(0)
+            log_content = log_file.read()
+            log_file.close()
+
+            # Verificar que se inició correctamente (multiplataforma)
+            if is_cloudflared_running():
+                print(f"[TUNNEL-START] ✅ Túnel iniciado correctamente")
+                return jsonify({
+                    'success': True,
+                    'message': f'Túnel iniciado correctamente',
+                    'subdomain': subdomain,
+                    'url': f'https://{subdomain}'
+                }), 200
+            else:
+                print(f"[TUNNEL-START] ❌ Túnel no está corriendo después de iniciar")
+                print(f"[TUNNEL-START] Logs de cloudflared:\n{log_content}")
+
+                return jsonify({
+                    'success': False,
+                    'message': f'Error al iniciar el túnel. Revisa la configuración en ~/.cloudflared/config.yml',
+                    'details': log_content[:500] if log_content else 'Sin logs disponibles'
+                }), 500
+        except Exception as start_error:
+            print(f"[TUNNEL-START] ❌ Excepción al iniciar: {start_error}")
             return jsonify({
                 'success': False,
-                'message': 'Error al iniciar el túnel'
+                'message': f'Error al ejecutar cloudflared: {str(start_error)}'
             }), 500
 
     except Exception as e:
@@ -166,7 +193,19 @@ def tunnel_status():
     """
     try:
         # Verificar si cloudflared está corriendo (multiplataforma)
-        is_active = is_cloudflared_running()
+        is_active = False
+        pids = []
+
+        try:
+            is_active = is_cloudflared_running()
+            if is_active:
+                # Obtener PIDs (multiplataforma)
+                pids = find_cloudflared_processes()
+        except Exception as check_error:
+            # Log el error pero no fallar - simplemente asumir que no está corriendo
+            print(f"[TUNNEL-STATUS] Error verificando cloudflared: {check_error}")
+            is_active = False
+            pids = []
 
         # Obtener configuración y determinar subdominio
         config = get_config_data()
@@ -186,14 +225,18 @@ def tunnel_status():
             'machine_id': config.get('machine_id', '')
         }
 
-        if is_active:
-            # Obtener PIDs (multiplataforma)
-            pids = find_cloudflared_processes()
+        if is_active and pids:
             response_data['pids'] = [str(pid) for pid in pids]
 
         return jsonify(response_data), 200
 
     except Exception as e:
+        # Log más detallado del error
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"[TUNNEL-STATUS] Error crítico: {e}")
+        print(f"[TUNNEL-STATUS] Traceback: {error_detail}")
+
         return jsonify({
             'success': False,
             'message': f'Error: {str(e)}'
