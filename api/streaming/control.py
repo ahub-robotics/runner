@@ -70,6 +70,27 @@ def start_streaming():
                         'success': False,
                         'message': 'El streaming ya está activo'
                     }), 400
+                elif task_state == 'PENDING':
+                    # Dar tiempo de gracia MUCHO MÁS LARGO a tareas PENDING
+                    # En Windows, Celery puede tardar más en procesar tareas
+                    started_at_str = state_dict.get('started_at')
+                    if started_at_str:
+                        started_at = float(started_at_str)
+                        time_elapsed = time.time() - started_at
+                        grace_period = 300  # 5 minutos de gracia
+
+                        if time_elapsed < grace_period:
+                            print(f"[STREAM-API] Tarea PENDING reciente ({time_elapsed:.1f}s), dando tiempo de gracia...")
+                            return jsonify({
+                                'success': False,
+                                'message': 'El streaming se está iniciando, espera unos segundos'
+                            }), 400
+
+                    print(f"[STREAM-API] ⚠️  Estado huérfano detectado (tarea PENDING > 5min)")
+                    print(f"[STREAM-API] ⚠️  Esto indica que el worker de Celery NO está funcionando")
+                    print(f"[STREAM-API] ⚠️  Reinicia el servidor para que el worker se inicie correctamente")
+                    state_manager.delete('streaming:state', 'streaming:stop_requested')
+                    print("[STREAM-API] Estado huérfano limpiado, continuando con inicio")
                 else:
                     print(f"[STREAM-API] ⚠️  Estado huérfano detectado (tarea {task_state}), limpiando...")
                     state_manager.delete('streaming:state', 'streaming:stop_requested')
@@ -234,9 +255,11 @@ def streaming_status():
                     task_state = task_result.state
 
                     # Estados válidos: STARTED, RETRY
-                    # Estados inválidos (huérfanos): PENDING, FAILURE, SUCCESS, REVOKED
-                    if task_state not in ['STARTED', 'RETRY']:
-                        print(f"[STREAM-STATUS] ⚠️  Estado huérfano detectado (tarea {task_state}), limpiando...")
+                    # IMPORTANTE: NO limpiar estados SUCCESS o PENDING inmediatamente
+                    # porque puede ser normal durante operación
+                    if task_state in ['FAILURE', 'REVOKED']:
+                        # Solo limpiar si la tarea realmente falló o fue revocada
+                        print(f"[STREAM-STATUS] ⚠️  Tarea falló o fue revocada ({task_state}), limpiando...")
                         state_manager.delete('streaming:state', 'streaming:stop_requested')
 
                         # Retornar como inactivo
@@ -246,16 +269,32 @@ def streaming_status():
                             'port': None,
                             'clients': 0
                         }), 200
+                    elif task_state == 'PENDING':
+                        # Tarea PENDING: dar tiempo de gracia
+                        started_at_str = state_dict.get('started_at')
+                        if started_at_str:
+                            started_at = float(started_at_str)
+                            time_elapsed = time.time() - started_at
+                            # Solo limpiar si lleva más de 5 minutos en PENDING
+                            if time_elapsed > 300:
+                                print(f"[STREAM-STATUS] ⚠️  Tarea PENDING > 5min, limpiando...")
+                                state_manager.delete('streaming:state', 'streaming:stop_requested')
+                                return jsonify({
+                                    'success': True,
+                                    'active': False,
+                                    'port': None,
+                                    'clients': 0
+                                }), 200
+                    elif task_state == 'SUCCESS':
+                        # Tarea completada: podría ser normal si se detuvo, verificar timestamp
+                        # Solo limpiar si el estado dice activo pero la tarea finalizó hace más de 10s
+                        # Esto da tiempo para que la UI refresque
+                        pass  # No limpiar inmediatamente
                 except Exception as e:
                     print(f"[STREAM-STATUS] Error verificando tarea: {e}")
-                    # En caso de error, asumir huérfano y limpiar
-                    state_manager.delete('streaming:state', 'streaming:stop_requested')
-                    return jsonify({
-                        'success': True,
-                        'active': False,
-                        'port': None,
-                        'clients': 0
-                    }), 200
+                    # En caso de error, NO limpiar automáticamente
+                    # Dejar que la tarea misma se limpie si es necesario
+                    pass
 
         port = int(state_dict.get('port', 8765)) if is_active else None
         clients_count = 0  # WebSocket clients - not tracked in SSE mode

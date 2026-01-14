@@ -255,33 +255,49 @@ def find_cloudflared_processes():
     return pids
 
 
-def kill_process(pid, force=False):
+def kill_process(pid, force=True):
     """
     Mata un proceso de forma simple y directa.
 
     Args:
         pid (int): PID del proceso a matar
-        force (bool): Si True, usa SIGKILL en lugar de SIGTERM
+        force (bool): Si True, usa SIGKILL/taskkill /F (default: True)
 
     Returns:
         bool: True si el proceso fue terminado, False si no
     """
     try:
         if platform.system() == 'Windows':
-            # En Windows, usar taskkill
+            # En Windows, usar taskkill con /F (force) por defecto
+            # Esto es necesario para procesos como cloudflared que no responden a SIGTERM
             cmd = ['taskkill', '/PID', str(pid)]
             if force:
-                cmd.insert(1, '/F')
-            subprocess.run(cmd, capture_output=True, timeout=5)
+                cmd.append('/F')
+
+            result = subprocess.run(cmd, capture_output=True, timeout=5, text=True)
+
+            # Verificar si se ejecutó correctamente
+            if result.returncode == 0:
+                print(f"   ✅ Proceso {pid} terminado correctamente")
+                return True
+            else:
+                # Si falló, puede ser que el proceso ya no existe (lo cual es OK)
+                if 'not found' in result.stderr.lower() or 'no se encuentra' in result.stderr.lower():
+                    print(f"   ℹ️  Proceso {pid} ya no existe")
+                    return True
+                else:
+                    print(f"   ⚠️  Error terminando proceso {pid}: {result.stderr}")
+                    return False
         else:
             # En Linux/macOS, usar kill directo
             sig = signal.SIGKILL if force else signal.SIGTERM
             os.kill(pid, sig)
-
-        return True
+            print(f"   ✅ Proceso {pid} terminado con señal {sig}")
+            return True
 
     except (ProcessLookupError, PermissionError):
         # Proceso ya no existe o no tenemos permisos
+        print(f"   ℹ️  Proceso {pid} ya no existe o no hay permisos")
         return True
     except subprocess.TimeoutExpired:
         print(f"   ⚠️  Timeout matando PID {pid}")

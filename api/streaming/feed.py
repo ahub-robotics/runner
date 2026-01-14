@@ -139,14 +139,17 @@ def stream_feed():
                 local_streamer = None
                 print("[STREAM-FEED] Streamer local limpiado (finally)")
 
+    # Preparar headers seguros para WSGI/Waitress
+    # Nota: No incluir 'Connection' ya que es un header "hop-by-hop" prohibido en WSGI
+    response_headers = {
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no'
+    }
+
     return Response(
         generate_frames(),
         mimetype='text/event-stream',
-        headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no',
-            'Connection': 'keep-alive'
-        }
+        headers=response_headers
     )
 
 

@@ -1,10 +1,10 @@
 {
-    "url": "http://127.0.0.1:8088/",
-    "token": "eff7df3018dc2b2271165865c0f78aa17ce5df27",
-    "machine_id": "I3WFQVS5FDHS",
-    "license_key": "BVXV9JC78STCV89333XVUV5B838LIU1VX4FT",
-    "ip": "0.0.0.0",
-    "port": "5055",
-    "tunnel_subdomain": "I3WFQVS5FDHS.automatehub.es",
-    "tunnel_id": "3d7de42c-4a8a-4447-b14f-053cc485ce6b"
+  "url": "https://robot-console-a73e07ff7a0d.herokuapp.com/",
+  "token": "M32P04WUPDQ6SQEFHI4XA7PVMP28QXSUJVRV",
+  "machine_id": "W2MM8Y94FCEW",
+  "license_key": "M32P04WUPDQ6SQEFHI4XA7PVMP28QXSUJVRV",
+  "ip": "0.0.0.0",
+  "port": 8088,
+  "tunnel_subdomain": "w2mm8y94fcew.automatehub.es",
+  "tunnel_id": "93c503991-a130-4c17-b759-358de6e86257"
 }

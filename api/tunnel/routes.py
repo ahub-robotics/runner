@@ -97,25 +97,68 @@ def start_tunnel():
         # En Windows, necesitamos el path completo del ejecutable
         cloudflared_path = shutil.which('cloudflared')
 
-        print(f"[TUNNEL-START] Iniciando cloudflared desde: {cloudflared_path}")
-        print(f"[TUNNEL-START] Comando: {cloudflared_path} tunnel run robotrunner")
+        # Leer el tunnel ID del config.yml
+        import re
+        tunnel_id_match = re.search(r'tunnel:\s*([a-f0-9\-]+)', config_content)
+        tunnel_id = tunnel_id_match.group(1) if tunnel_id_match else None
+
+        # Comando: Si tenemos tunnel_id, usarlo; sino usar 'tunnel run' sin nombre
+        # que usará el config.yml automáticamente
+        if tunnel_id:
+            cmd = [cloudflared_path, 'tunnel', 'run', tunnel_id]
+            print(f"[TUNNEL-START] Iniciando cloudflared desde: {cloudflared_path}")
+            print(f"[TUNNEL-START] Comando: {' '.join(cmd)}")
+            print(f"[TUNNEL-START] Tunnel ID: {tunnel_id}")
+        else:
+            # Fallback: usar 'tunnel run' sin argumentos, lee config.yml automáticamente
+            cmd = [cloudflared_path, 'tunnel', 'run']
+            print(f"[TUNNEL-START] Iniciando cloudflared desde: {cloudflared_path}")
+            print(f"[TUNNEL-START] Comando: {' '.join(cmd)} (usando config.yml)")
 
         # Capturar salida para debugging
         import tempfile
+        import platform
         log_file = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.log')
 
         try:
-            process = subprocess.Popen(
-                [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                start_new_session=True
-            )
+            # En Windows, usar creationflags para iniciar proceso detached
+            # Esto permite que el proceso continúe ejecutándose independientemente
+            if platform.system() == 'Windows':
+                # DETACHED_PROCESS = 0x00000008 - Proceso independiente
+                # CREATE_NO_WINDOW = 0x08000000 - Sin ventana de consola visible
+                # Nota: No usamos CREATE_NEW_PROCESS_GROUP porque puede causar que se muestre ventana
+                DETACHED_PROCESS = 0x00000008
+                CREATE_NO_WINDOW = 0x08000000
+                creation_flags = DETACHED_PROCESS | CREATE_NO_WINDOW
+
+                # Usar startupinfo para máxima ocultación
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0  # SW_HIDE = 0
+
+                # Redirigir todo a DEVNULL para evitar pipes que puedan crear ventanas
+                process = subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=creation_flags,
+                    startupinfo=startupinfo,
+                    shell=False
+                )
+            else:
+                # Unix/Linux: usar start_new_session
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True
+                )
 
             print(f"[TUNNEL-START] Proceso iniciado con PID: {process.pid}")
 
             # Esperar un momento para verificar que se inició
-            time.sleep(3)
+            time.sleep(5)
 
             # Leer logs si el proceso falló
             log_file.seek(0)
@@ -125,11 +168,13 @@ def start_tunnel():
             # Verificar que se inició correctamente (multiplataforma)
             if is_cloudflared_running():
                 print(f"[TUNNEL-START] ✅ Túnel iniciado correctamente")
+                print(f"[TUNNEL-START] URL del túnel: https://{hostname}")
                 return jsonify({
                     'success': True,
                     'message': f'Túnel iniciado correctamente',
                     'subdomain': hostname,
-                    'url': f'https://{hostname}'
+                    'url': f'https://{hostname}',
+                    'pid': process.pid
                 }), 200
             else:
                 print(f"[TUNNEL-START] ❌ Túnel no está corriendo después de iniciar")
@@ -142,6 +187,8 @@ def start_tunnel():
                 }), 500
         except Exception as start_error:
             print(f"[TUNNEL-START] ❌ Excepción al iniciar: {start_error}")
+            import traceback
+            traceback.print_exc()
             return jsonify({
                 'success': False,
                 'message': f'Error al ejecutar cloudflared: {str(start_error)}'

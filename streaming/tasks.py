@@ -68,7 +68,12 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
         # Mantener la tarea viva mientras el streaming esté activo
         # Verificar cada segundo si se solicitó detener o si no hay clientes
         task_start_time = time.time()
-        inactivity_timeout = 30  # 30 segundos sin clientes → auto-stop
+        grace_period = 120  # 2 minutos de gracia para que se conecte el primer cliente
+        inactivity_timeout = 60  # 60 segundos sin clientes después de actividad → auto-stop
+        had_clients = False  # Flag para saber si alguna vez tuvo clientes
+
+        print(f"[STREAMING-TASK] Período de gracia: {grace_period}s para primer cliente")
+        print(f"[STREAMING-TASK] Timeout de inactividad: {inactivity_timeout}s después de actividad")
 
         while True:
             time.sleep(1)
@@ -97,23 +102,36 @@ def start_streaming_task(self, host='0.0.0.0', port=8765, fps=15, quality=50, us
             last_activity_str = state_manager.get('streaming:last_client_activity')
 
             if last_activity_str:
-                # Hay actividad registrada - verificar si es reciente
+                # Hay actividad registrada - marcar que tuvo clientes
+                had_clients = True
+
+                # Verificar si es reciente
                 try:
                     last_activity_decoded = last_activity_str.decode('utf-8') if isinstance(last_activity_str, bytes) else last_activity_str
                     last_activity = float(last_activity_decoded)
                     inactive_time = time.time() - last_activity
 
-                    if inactive_time > inactivity_timeout:
+                    # Solo aplicar timeout si ya pasó el período de gracia
+                    time_since_start = time.time() - task_start_time
+                    if time_since_start > grace_period and inactive_time > inactivity_timeout:
                         print(f"[STREAMING-TASK] ⏱️  Sin clientes por {int(inactive_time)}s → auto-stop")
                         break
                 except Exception as e:
                     print(f"[STREAMING-TASK] Error verificando actividad: {e}")
             else:
-                # No hay actividad registrada - verificar tiempo desde inicio
+                # No hay actividad registrada
                 time_since_start = time.time() - task_start_time
-                if time_since_start > inactivity_timeout:
-                    print(f"[STREAMING-TASK] ⏱️  Sin clientes desde inicio ({int(time_since_start)}s) → auto-stop")
-                    break
+
+                # Si ya tuvo clientes antes y ahora no hay actividad, aplicar timeout
+                if had_clients:
+                    if time_since_start > grace_period:
+                        print(f"[STREAMING-TASK] ⏱️  Clientes desconectados, sin actividad → auto-stop")
+                        break
+                else:
+                    # Nunca tuvo clientes - verificar período de gracia
+                    if time_since_start > grace_period:
+                        print(f"[STREAMING-TASK] ⏱️  Sin clientes durante {grace_period}s desde inicio → auto-stop")
+                        break
 
         # Limpiar estado en el backend
         state_manager.delete('streaming:state', 'streaming:stop_requested')

@@ -71,7 +71,7 @@ def get_config_data():
         - ip: Auto-detected via ifconfig.me
         - port: 8088
         - tunnel_subdomain: Empty string
-        - tunnel_id: 3d7de42c-4a8a-4447-b14f-053cc485ce6b
+        - tunnel_id: Empty string (must be configured per machine)
 
     Returns:
         dict: Configuration dictionary with all settings
@@ -95,7 +95,9 @@ def get_config_data():
         kwargs['ip'] = json_data.get('ip', os.popen('curl -s ifconfig.me').readline())
         kwargs['port'] = json_data.get('port', "8088")
         kwargs['tunnel_subdomain'] = json_data.get('tunnel_subdomain', '')
-        kwargs['tunnel_id'] = json_data.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b')
+        # IMPORTANTE: NO usar tunnel_id compartido por defecto
+        # Cada máquina debe tener su propio tunnel_id configurado en config.json
+        kwargs['tunnel_id'] = json_data.get('tunnel_id', '')
 
     return kwargs
 

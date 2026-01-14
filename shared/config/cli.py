@@ -208,17 +208,25 @@ def start_tunnel_cli():
             print("   Ejecutar primero: python run.py --setup-tunnel")
             return
 
+        # Get tunnel_id from config
+        config = get_config_data()
+        tunnel_id = config.get('tunnel_id')
+        if not tunnel_id:
+            print("❌ Error: tunnel_id no configurado en config.json")
+            print("   Ejecutar primero: python run.py --setup-tunnel")
+            return
+
         # Check if already running (multiplataforma)
         if is_cloudflared_running():
             print("⚠️  El túnel ya está activo")
             return
 
         # Start tunnel
-        print("🚀 Iniciando túnel...")
+        print(f"🚀 Iniciando túnel (ID: {tunnel_id})...")
         # En Windows, necesitamos el path completo del ejecutable
         cloudflared_path = shutil.which('cloudflared')
         subprocess.Popen(
-            [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
+            [cloudflared_path, 'tunnel', 'run', tunnel_id],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
@@ -228,7 +236,6 @@ def start_tunnel_cli():
 
         # Verify it started (multiplataforma)
         if is_cloudflared_running():
-            config = get_config_data()
             hostname = get_tunnel_hostname(config)
 
             print("✅ Túnel iniciado correctamente")
@@ -306,7 +313,13 @@ def setup_tunnel_cli(config):
             print("   Ejecutar con: python run.py --machine_id=TU_ID --setup-tunnel")
             return
 
-        tunnel_id = config.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b')
+        # Read tunnel_id from config - NO usar valor por defecto hardcoded
+        tunnel_id = config.get('tunnel_id')
+        if not tunnel_id:
+            print("❌ Error: tunnel_id no configurado")
+            print("   Ejecutar con: python run.py --tunnel_id=TU_TUNNEL_ID --setup-tunnel")
+            return
+
         hostname = get_tunnel_hostname(config)
         port = config.get('port', '5055')
 
@@ -341,10 +354,10 @@ ingress:
 
         print("✅ Archivo de configuración creado")
 
-        # Create DNS route
+        # Create DNS route usando tunnel_id (NO 'robotrunner' hardcoded)
         print("🌐 Configurando DNS en Cloudflare...")
         result = subprocess.run(
-            ['cloudflared', 'tunnel', 'route', 'dns', 'robotrunner', hostname],
+            ['cloudflared', 'tunnel', 'route', 'dns', tunnel_id, hostname],
             capture_output=True,
             text=True
         )

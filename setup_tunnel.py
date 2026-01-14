@@ -378,6 +378,116 @@ def authenticate_cloudflare(cloudflared_dir):
         return None
 
 
+def create_new_tunnel(cloudflared_dir):
+    """Crea un nuevo túnel automáticamente con ID único."""
+    print()
+    print_info("Esta opción creará un túnel NUEVO exclusivo para esta máquina")
+    print()
+
+    # Leer machine_id desde config.json
+    try:
+        import sys
+        project_root = Path(__file__).parent.absolute()
+        sys.path.insert(0, str(project_root))
+        from shared.config.loader import get_config_data
+
+        config = get_config_data()
+        machine_id = config.get('machine_id', '').strip()
+
+        if not machine_id:
+            print_error("machine_id no está configurado en config.json")
+            print_info("El machine_id se usa para nombrar el túnel")
+            print()
+            machine_id = input(f"{Colors.CYAN}   Ingresa el Machine ID: {Colors.RESET}").strip()
+            if not machine_id:
+                print_error("Machine ID es requerido")
+                return None
+    except Exception as e:
+        print_warning(f"No se pudo leer config.json: {e}")
+        print()
+        machine_id = input(f"{Colors.CYAN}   Ingresa el Machine ID: {Colors.RESET}").strip()
+        if not machine_id:
+            print_error("Machine ID es requerido")
+            return None
+
+    # Generar nombre del túnel basado en machine_id
+    tunnel_name = f"robotrunner-{machine_id.lower()}"
+
+    print()
+    print(f"📋 Nombre del túnel: {Colors.BOLD}{tunnel_name}{Colors.RESET}")
+    print()
+
+    response = input(f"{Colors.CYAN}   ¿Crear este túnel? (s/n) [s]: {Colors.RESET}").strip().lower()
+    if response and response not in ['s', 'y', 'yes', 'si', 'sí']:
+        print_info("Creación cancelada")
+        return None
+
+    try:
+        # Paso 1: Autenticar con Cloudflare
+        print()
+        print_info("Paso 1/3: Autenticándote con Cloudflare...")
+        print_warning("Se abrirá tu navegador para autenticarte")
+        print()
+
+        result = run_command(['cloudflared', 'tunnel', 'login'], capture=False)
+        if result.returncode != 0:
+            print_error("Error en la autenticación")
+            return None
+
+        print()
+        print_success("Autenticación exitosa")
+
+        # Paso 2: Crear el túnel
+        print()
+        print_info(f"Paso 2/3: Creando túnel '{tunnel_name}'...")
+        result = run_command(['cloudflared', 'tunnel', 'create', tunnel_name])
+
+        if result.returncode != 0:
+            print_error(f"Error al crear túnel: {result.stderr}")
+            return None
+
+        # Extraer tunnel_id del output
+        # Output típico: "Created tunnel robotrunner-w2mm8y94fcew with id 93c53399-a130-4c17-b759-358de6e86257"
+        import re
+        tunnel_id_match = re.search(r'with id ([a-f0-9\-]+)', result.stdout)
+        if not tunnel_id_match:
+            print_error("No se pudo obtener el tunnel ID del output")
+            print_info(f"Output: {result.stdout}")
+            return None
+
+        tunnel_id = tunnel_id_match.group(1)
+        print_success(f"Túnel creado con ID: {tunnel_id}")
+
+        # Paso 3: Verificar que se crearon las credenciales
+        print()
+        print_info("Paso 3/3: Verificando credenciales...")
+
+        cloudflared_dir.mkdir(parents=True, exist_ok=True)
+        cred_file = cloudflared_dir / f'{tunnel_id}.json'
+
+        if not cred_file.exists():
+            print_error(f"Archivo de credenciales no encontrado: {cred_file}")
+            return None
+
+        print_success(f"Credenciales creadas: {cred_file}")
+
+        print()
+        print(f"{Colors.GREEN}✅ Túnel creado exitosamente!{Colors.RESET}")
+        print()
+
+        return {
+            'id': tunnel_id,
+            'credentials_file': str(cred_file),
+            'name': tunnel_name
+        }
+
+    except Exception as e:
+        print_error(f"Error al crear túnel: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def find_tunnel_credentials():
     """Encuentra archivos de credenciales de tunnel."""
     print_step(2, "Detectando tunnels...")
@@ -405,13 +515,16 @@ def find_tunnel_credentials():
         print()
         print(f"{Colors.CYAN}Selecciona una opción:{Colors.RESET}")
         print()
-        print(f"{Colors.YELLOW}[1] Pegar contenido JSON de credenciales (RECOMENDADO){Colors.RESET}")
+        print(f"{Colors.YELLOW}[1] Crear túnel NUEVO automáticamente (RECOMENDADO){Colors.RESET}")
+        print_info("Crea un túnel exclusivo para esta máquina con ID único")
+        print()
+        print(f"{Colors.YELLOW}[2] Pegar contenido JSON de credenciales{Colors.RESET}")
         print_info("Si tienes el archivo .json en otro servidor, copia su contenido aquí")
         print()
-        print(f"{Colors.YELLOW}[2] Proporcionar ruta a archivo de credenciales{Colors.RESET}")
+        print(f"{Colors.YELLOW}[3] Proporcionar ruta a archivo de credenciales{Colors.RESET}")
         print_info("Si ya tienes el archivo .json en este servidor")
         print()
-        print(f"{Colors.YELLOW}[3] Autenticarse con Cloudflare{Colors.RESET}")
+        print(f"{Colors.YELLOW}[4] Autenticarse con Cloudflare y usar túnel existente{Colors.RESET}")
         print_info("Ejecutará: cloudflared tunnel login")
         print()
 
@@ -421,13 +534,15 @@ def find_tunnel_credentials():
                 choice = '1'
 
             if choice == '1':
-                return create_credentials_from_json(cloudflared_dir)
+                return create_new_tunnel(cloudflared_dir)
             elif choice == '2':
-                return load_credentials_from_file(cloudflared_dir)
+                return create_credentials_from_json(cloudflared_dir)
             elif choice == '3':
+                return load_credentials_from_file(cloudflared_dir)
+            elif choice == '4':
                 return authenticate_cloudflare(cloudflared_dir)
             else:
-                print_error("Opción inválida. Ingresa 1, 2 o 3")
+                print_error("Opción inválida. Ingresa 1, 2, 3 o 4")
 
         return None
 
@@ -464,19 +579,51 @@ def find_tunnel_credentials():
     }
 
 
-def get_tunnel_config():
+def get_tunnel_config(tunnel_info=None):
     """Solicita configuración del tunnel al usuario."""
     print_step(3, "Configuración del tunnel...")
     print()
 
-    # Hostname
-    print(f"{Colors.CYAN}   Ingresa el hostname (subdominio) del tunnel:{Colors.RESET}")
-    print_info("Ejemplo: robot.tudominio.com")
-    while True:
+    # Obtener machine_id desde config.json para generar hostname automáticamente
+    try:
+        import sys
+        project_root = Path(__file__).parent.absolute()
+        sys.path.insert(0, str(project_root))
+        from shared.config.loader import get_config_data
+
+        config = get_config_data()
+        machine_id = config.get('machine_id', '').strip()
+
+        if machine_id:
+            # Generar hostname automáticamente basado en machine_id
+            auto_hostname = f"{machine_id.lower()}.automatehub.es"
+            print_info(f"Hostname sugerido basado en Machine ID: {auto_hostname}")
+            print()
+
+            use_auto = input(f"{Colors.CYAN}   ¿Usar este hostname? (s/n) [s]: {Colors.RESET}").strip().lower()
+            if not use_auto or use_auto in ['s', 'y', 'yes', 'si', 'sí']:
+                hostname = auto_hostname
+            else:
+                hostname = input(f"{Colors.CYAN}   Ingresa el hostname: {Colors.RESET}").strip()
+                if not hostname:
+                    print_error("Hostname es requerido")
+                    return None
+        else:
+            # Si no hay machine_id, solicitar hostname manualmente
+            print(f"{Colors.CYAN}   Ingresa el hostname (subdominio) del tunnel:{Colors.RESET}")
+            print_info("Ejemplo: robot.automatehub.es")
+            hostname = input(f"{Colors.CYAN}   Hostname: {Colors.RESET}").strip()
+            if not hostname:
+                print_error("Hostname es requerido")
+                return None
+    except:
+        # Fallback: solicitar hostname manualmente
+        print(f"{Colors.CYAN}   Ingresa el hostname (subdominio) del tunnel:{Colors.RESET}")
+        print_info("Ejemplo: robot.automatehub.es")
         hostname = input(f"{Colors.CYAN}   Hostname: {Colors.RESET}").strip()
-        if hostname:
-            break
-        print_error("Hostname es requerido")
+        if not hostname:
+            print_error("Hostname es requerido")
+            return None
 
     # Puerto
     print()
@@ -529,6 +676,37 @@ ingress:
     print(f"{Colors.GRAY}   ─────────────────────────────────────────{Colors.RESET}")
 
     return config_path
+
+
+def save_tunnel_to_project_config(tunnel_info, hostname):
+    """Guarda el tunnel_id y hostname en config.json del proyecto."""
+    print()
+    print_info("Guardando configuración del túnel en config.json...")
+
+    try:
+        import sys
+        project_root = Path(__file__).parent.absolute()
+        sys.path.insert(0, str(project_root))
+        from shared.config.loader import get_config_data, write_to_config
+
+        # Leer configuración actual
+        config_data = get_config_data()
+
+        # Actualizar con los datos del túnel
+        config_data['tunnel_id'] = tunnel_info['id']
+        config_data['tunnel_subdomain'] = hostname
+
+        # Guardar configuración
+        write_to_config(config_data)
+
+        print_success(f"tunnel_id guardado: {tunnel_info['id']}")
+        print_success(f"tunnel_subdomain guardado: {hostname}")
+
+    except Exception as e:
+        print_warning(f"No se pudo actualizar config.json: {e}")
+        print_info("Tendrás que configurar tunnel_id manualmente en config.json")
+        print_info(f"  tunnel_id: {tunnel_info['id']}")
+        print_info(f"  tunnel_subdomain: {hostname}")
 
 
 def install_service():
@@ -722,6 +900,10 @@ def main():
 
     # 4. Crear archivo de configuración
     config_path = create_config_file(tunnel_info, config)
+    print()
+
+    # 4.5. Guardar tunnel_id en config.json del proyecto
+    save_tunnel_to_project_config(tunnel_info, config['hostname'])
     print()
 
     # 5. Instalar como servicio

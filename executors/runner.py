@@ -163,7 +163,7 @@ class Runner:
         Pausa la ejecución del robot de manera multiplataforma.
 
         Funciona en:
-        - Windows: Usa psutil.Process.suspend()
+        - Windows: Usa psutil.Process.suspend() en todos los procesos de la jerarquía
         - Linux: Usa psutil.Process.suspend()
         - macOS: Usa psutil.Process.suspend()
 
@@ -172,20 +172,52 @@ class Runner:
         if self.run_robot_process:
             if self.run_robot_process and self.run_robot_process.poll() is None:
                 try:
-                    # Usar psutil en todas las plataformas para consistencia
+                    # Obtener el proceso padre (puede ser cmd.exe en Windows si se usa shell=True)
                     parent = psutil.Process(self.run_robot_process.pid)
 
-                    # Suspender procesos hijos primero (de abajo hacia arriba)
-                    children = parent.children(recursive=True)
-                    for child in children:
-                        try:
-                            child.suspend()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                            print(f"Warning: Could not suspend child process {child.pid}: {e}")
+                    # Recolectar TODOS los procesos a suspender (padre + hijos)
+                    processes_to_suspend = []
 
-                    # Suspender proceso padre al final
-                    parent.suspend()
-                    self.send_log("Execution Paused")
+                    # Agregar proceso padre
+                    processes_to_suspend.append(parent)
+
+                    # Obtener hijos recursivamente
+                    try:
+                        children = parent.children(recursive=True)
+                        processes_to_suspend.extend(children)
+                        print(f"[PAUSE] Encontrados {len(children)} procesos hijos")
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+
+                    # En Windows, esperamos un momento para asegurar que todos los procesos estén iniciados
+                    if platform.system() == 'Windows':
+                        time.sleep(0.1)
+                        # Volver a verificar por si aparecieron más hijos
+                        try:
+                            children = parent.children(recursive=True)
+                            # Agregar solo nuevos procesos
+                            for child in children:
+                                if child not in processes_to_suspend:
+                                    processes_to_suspend.append(child)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+
+                    print(f"[PAUSE] Total de procesos a suspender: {len(processes_to_suspend)}")
+
+                    # Suspender todos los procesos (de hijos a padres)
+                    suspended_count = 0
+                    for proc in reversed(processes_to_suspend):  # reversed para suspender hijos primero
+                        try:
+                            # Verificar que el proceso aún existe antes de suspender
+                            if proc.is_running():
+                                proc.suspend()
+                                suspended_count += 1
+                                print(f"[PAUSE] Suspendido PID {proc.pid} ({proc.name()})")
+                        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
+                            print(f"Warning: No se pudo suspender proceso {proc.pid}: {e}")
+
+                    print(f"[PAUSE] ✅ Total suspendidos: {suspended_count}/{len(processes_to_suspend)}")
+                    self.send_log(f"Execution Paused ({suspended_count} processes)")
 
                     # Actualizar estado en Redis para confirmar que se pausó exitosamente
                     if hasattr(self, 'redis_state') and self.redis_state and self.execution_id:
@@ -206,7 +238,7 @@ class Runner:
         Reanuda la ejecución del robot de manera multiplataforma.
 
         Funciona en:
-        - Windows: Usa psutil.Process.resume()
+        - Windows: Usa psutil.Process.resume() en todos los procesos de la jerarquía
         - Linux: Usa psutil.Process.resume()
         - macOS: Usa psutil.Process.resume()
 
@@ -215,21 +247,39 @@ class Runner:
         if self.run_robot_process:
             if self.run_robot_process and self.run_robot_process.poll() is None:
                 try:
-                    # Usar psutil en todas las plataformas para consistencia
+                    # Obtener el proceso padre (puede ser cmd.exe en Windows si se usa shell=True)
                     parent = psutil.Process(self.run_robot_process.pid)
 
-                    # Reanudar proceso padre primero
-                    parent.resume()
+                    # Recolectar TODOS los procesos a reanudar (padre + hijos)
+                    processes_to_resume = []
 
-                    # Reanudar procesos hijos después (de arriba hacia abajo)
-                    children = parent.children(recursive=True)
-                    for child in children:
+                    # Agregar proceso padre
+                    processes_to_resume.append(parent)
+
+                    # Obtener hijos recursivamente
+                    try:
+                        children = parent.children(recursive=True)
+                        processes_to_resume.extend(children)
+                        print(f"[RESUME] Encontrados {len(children)} procesos hijos")
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+
+                    print(f"[RESUME] Total de procesos a reanudar: {len(processes_to_resume)}")
+
+                    # Reanudar todos los procesos (de padres a hijos)
+                    resumed_count = 0
+                    for proc in processes_to_resume:  # padre primero, luego hijos
                         try:
-                            child.resume()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                            print(f"Warning: Could not resume child process {child.pid}: {e}")
+                            # Verificar que el proceso aún existe antes de reanudar
+                            if proc.is_running():
+                                proc.resume()
+                                resumed_count += 1
+                                print(f"[RESUME] Reanudado PID {proc.pid} ({proc.name()})")
+                        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
+                            print(f"Warning: No se pudo reanudar proceso {proc.pid}: {e}")
 
-                    self.send_log("Execution Resumed")
+                    print(f"[RESUME] ✅ Total reanudados: {resumed_count}/{len(processes_to_resume)}")
+                    self.send_log(f"Execution Resumed ({resumed_count} processes)")
 
                     # Actualizar estado en Redis para confirmar que se reanudó exitosamente
                     if hasattr(self, 'redis_state') and self.redis_state and self.execution_id:
@@ -463,9 +513,9 @@ class Runner:
                 setup_command = [
                     f"py -m venv {self.robot_folder}\\venv",
                     f"{self.robot_folder}\\venv\\Scripts\\activate",
-                    f"py -m pip install -q -r \"{self.robot_folder}\\requirements.txt\""
+                    f"\"{self.robot_folder}\\venv\\Scripts\\python.exe\" -m pip install -q -r \"{self.robot_folder}\\requirements.txt\""
                 ]
-                run_command = f"python \"{self.robot_folder}\\main.py\" \"{args}\""
+                run_command = f"\"{self.robot_folder}\\venv\\Scripts\\python.exe\" \"{self.robot_folder}\\main.py\" \"{args}\""
             else:
                 setup_command = [
                     f"python3 -m venv {self.robot_folder}/venv",
@@ -544,11 +594,11 @@ class Runner:
 
         # Configurar lectura no bloqueante para Unix
         import select
-        import fcntl
         import os
 
         if platform.system() != 'Windows':
             # En Unix, hacer el file descriptor no bloqueante
+            import fcntl
             fd = self.run_robot_process.stdout.fileno()
             fl = fcntl.fcntl(fd, fcntl.F_GETFL)
             fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)

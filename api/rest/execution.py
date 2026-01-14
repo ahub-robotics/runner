@@ -289,7 +289,7 @@ def stop_robot():
         )
 
     # Validar contra Redis (reemplaza JSON file)
-    state = get_state_manager().load_execution_state(received_execution_id)
+    state = get_state_manager().get_execution_state(received_execution_id)
 
     if not state:
         print(f"[STOP] ❌ Ejecución no encontrada en Redis")
@@ -389,7 +389,7 @@ def pause_robot():
         )
 
     # Validar contra Redis (reemplaza JSON file)
-    state = get_state_manager().load_execution_state(received_execution_id)
+    state = get_state_manager().get_execution_state(received_execution_id)
 
     if not state or state.get('status') not in ['running', 'pending']:
         print(f"[PAUSE] ❌ Ejecución no válida para pausar")
@@ -470,7 +470,7 @@ def resume_robot():
         )
 
     # Validar contra Redis (reemplaza JSON file)
-    state = get_state_manager().load_execution_state(received_execution_id)
+    state = get_state_manager().get_execution_state(received_execution_id)
 
     if not state or state.get('status') != 'paused':
         print(f"[RESUME] ❌ Ejecución no válida para reanudar")

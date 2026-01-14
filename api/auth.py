@@ -142,13 +142,13 @@ def require_auth_sse(f):
         def send_error():
             yield "data: error_unauthorized\n\n"
 
+        # Headers seguros para WSGI/Waitress (sin 'Connection')
         return Response(
             send_error(),
             mimetype='text/event-stream',
             headers={
                 'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no',
-                'Connection': 'keep-alive'
+                'X-Accel-Buffering': 'no'
             }
         )
 

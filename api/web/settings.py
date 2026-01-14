@@ -59,6 +59,7 @@ def settings():
             old_port = str(old_config.get('port', '5055'))
 
             # Obtener datos del formulario
+            # IMPORTANTE: NO usar tunnel_id hardcoded por defecto, usar el del config actual
             new_config = {
                 'url': request.form.get('url', ''),
                 'token': request.form.get('token', ''),
@@ -67,17 +68,26 @@ def settings():
                 'ip': request.form.get('ip', '0.0.0.0'),
                 'port': request.form.get('port', '5055'),
                 'tunnel_subdomain': request.form.get('tunnel_subdomain', ''),
-                'tunnel_id': request.form.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b')
+                'tunnel_id': request.form.get('tunnel_id', old_config.get('tunnel_id', ''))
             }
+
+            print(f"[SETTINGS] Configuración recibida del formulario:")
+            print(f"  - tunnel_subdomain: '{new_config['tunnel_subdomain']}'")
+            print(f"  - tunnel_id: '{new_config['tunnel_id']}'")
+            print(f"  - port: '{new_config['port']}'")
 
             # Determinar nuevo hostname del túnel
             new_hostname = get_tunnel_hostname(new_config)
             new_port = str(new_config.get('port', '5055'))
 
+            print(f"[SETTINGS] Hostname calculado: '{new_hostname}' (anterior: '{old_hostname}')")
+
             # Verificar si cambió el hostname o el puerto
             hostname_changed = old_hostname.lower() != new_hostname.lower()
             port_changed = old_port != new_port
             tunnel_config_changed = hostname_changed or port_changed
+
+            print(f"[SETTINGS] ¿Cambió hostname? {hostname_changed}, ¿Cambió puerto? {port_changed}")
 
             # Verificar si el túnel está activo antes de hacer cambios (multiplataforma)
             tunnel_was_active = False
@@ -99,8 +109,16 @@ def settings():
 
             # Actualizar archivo de configuración de Cloudflare
             cloudflare_config_path = Path.home() / '.cloudflared' / 'config.yml'
-            tunnel_id = new_config.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b')
+            # IMPORTANTE: NO usar tunnel_id hardcoded por defecto
+            tunnel_id = new_config.get('tunnel_id', '')
+            if not tunnel_id:
+                raise ValueError("tunnel_id no configurado en el formulario")
             credentials_path = Path.home() / '.cloudflared' / f'{tunnel_id}.json'
+
+            # Detectar si el servidor tiene SSL configurado
+            ssl_folder = Path.home() / 'Robot' / 'ssl'
+            has_ssl = (ssl_folder / 'cert.pem').exists() and (ssl_folder / 'key.pem').exists()
+            service_protocol = 'https' if has_ssl else 'http'
 
             config_content = f"""tunnel: {tunnel_id}
 credentials-file: {credentials_path}
@@ -108,9 +126,15 @@ credentials-file: {credentials_path}
 ingress:
   # Subdominio configurado: {hostname}
   - hostname: {hostname}
-    service: https://localhost:{new_port}
+    service: {service_protocol}://localhost:{new_port}"""
+
+            # Si usa HTTPS, añadir noTLSVerify
+            if has_ssl:
+                config_content += """
     originRequest:
-      noTLSVerify: true
+      noTLSVerify: true"""
+
+            config_content += """
   - service: http_status:404
 """
 
@@ -118,26 +142,67 @@ ingress:
             with open(cloudflare_config_path, 'w') as f:
                 f.write(config_content)
 
-            # Crear ruta DNS en Cloudflare
-            subprocess.run(
-                ['cloudflared', 'tunnel', 'route', 'dns', 'robotrunner', hostname],
-                capture_output=True,
-                text=True
-            )
+            print(f"[SETTINGS] ✅ Config.yml actualizado con hostname: {hostname}")
+
+            # Crear ruta DNS en Cloudflare usando tunnel_id
+            try:
+                result = subprocess.run(
+                    ['cloudflared', 'tunnel', 'route', 'dns', tunnel_id, hostname],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    print(f"[SETTINGS] ✅ Ruta DNS creada: {hostname} -> {tunnel_id}")
+                else:
+                    # No es crítico si falla, puede ser que ya exista la ruta
+                    print(f"[SETTINGS] ⚠️  Advertencia al crear ruta DNS: {result.stderr}")
+            except Exception as dns_error:
+                # No es crítico, continuar
+                print(f"[SETTINGS] ⚠️  No se pudo crear ruta DNS: {dns_error}")
 
             # Si el túnel estaba activo, reiniciarlo con la nueva configuración
             if tunnel_was_active:
                 # En Windows, necesitamos el path completo del ejecutable
                 import shutil
+                import platform as plat
                 cloudflared_path = shutil.which('cloudflared')
+
                 if cloudflared_path:
-                    subprocess.Popen(
-                        [cloudflared_path, 'tunnel', 'run', 'robotrunner'],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        start_new_session=True
-                    )
-                    time.sleep(2)  # Esperar a que se inicie
+                    print(f"[SETTINGS] 🔄 Reiniciando túnel con ID: {tunnel_id}")
+
+                    # Usar flags correctas según el sistema operativo
+                    if plat.system() == 'Windows':
+                        # Windows: usar creationflags para proceso detached y sin ventana
+                        DETACHED_PROCESS = 0x00000008
+                        CREATE_NO_WINDOW = 0x08000000
+                        creation_flags = DETACHED_PROCESS | CREATE_NO_WINDOW
+
+                        # Usar startupinfo para máxima ocultación
+                        startupinfo = subprocess.STARTUPINFO()
+                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0  # SW_HIDE = 0
+
+                        subprocess.Popen(
+                            [cloudflared_path, 'tunnel', 'run', tunnel_id],
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            creationflags=creation_flags,
+                            startupinfo=startupinfo,
+                            shell=False
+                        )
+                    else:
+                        # Unix/Linux: usar start_new_session
+                        subprocess.Popen(
+                            [cloudflared_path, 'tunnel', 'run', tunnel_id],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True
+                        )
+
+                    time.sleep(3)  # Esperar a que se inicie
+                    print(f"[SETTINGS] ✅ Túnel reiniciado")
 
             # Actualizar el servidor global con la nueva configuración
             from executors.server import Server

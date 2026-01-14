@@ -188,6 +188,13 @@ def main():
         except:
             local_ip = '127.0.0.1'
 
+        # Obtener hostname del túnel si está configurado
+        tunnel_hostname = config.get('tunnel_subdomain', '')
+        if tunnel_hostname:
+            # Normalizar hostname del túnel (usar función de utils)
+            from shared.utils.tunnel import get_tunnel_hostname
+            tunnel_hostname = get_tunnel_hostname(config)
+
         # Mostrar información de inicio
         print("\n" + "="*70)
         print("🚀 Iniciando Robot Runner Server (Windows)...")
@@ -206,14 +213,33 @@ def main():
         print("\n🌐 URLs de acceso:")
         print(f"   • Local:    {protocol}://localhost:{port}")
         print(f"   • Red:      {protocol}://{local_ip}:{port}")
+
+        # Mostrar URL del túnel si está configurado
+        if tunnel_hostname and tunnel_hostname != 'N/A':
+            print(f"   • Túnel:    https://{tunnel_hostname}")
+            print(f"     (requiere túnel activo - usar /tunnel/start)")
+
         print("="*70 + "\n")
+
+        # IMPORTANTE: En Windows, usar 0.0.0.0 es correcto
+        # Esto permite acceso desde:
+        # - localhost (127.0.0.1) - necesario para el túnel Cloudflare
+        # - IP local (ej: 192.168.x.x) - necesario para acceso de red local
+        # - 0.0.0.0 escucha en todas las interfaces IPv4
+        bind_host = '0.0.0.0'
+
+        print(f"[SERVIDOR] Binding a: {bind_host}:{port} (todas las interfaces IPv4)")
+        print(f"[SERVIDOR] El servidor responderá en:")
+        print(f"           - localhost:{port} (para túnel Cloudflare)")
+        print(f"           - {local_ip}:{port} (para red local)")
+        print()
 
         # Configurar y ejecutar Waitress
         if ssl_enabled:
             # Waitress con SSL
             serve(
                 flask_app,
-                host='0.0.0.0',
+                host=bind_host,
                 port=port,
                 threads=4,
                 channel_timeout=300,
@@ -224,7 +250,7 @@ def main():
             # Waitress sin SSL
             serve(
                 flask_app,
-                host='0.0.0.0',
+                host=bind_host,
                 port=port,
                 threads=4,
                 channel_timeout=300,

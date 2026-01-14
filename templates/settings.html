@@ -401,10 +401,11 @@
                 </div>
 
                 <!-- Tunnel ID (oculto/readonly) -->
+                <!-- IMPORTANTE: NO usar tunnel_id compartido por defecto -->
                 <input
                     type="hidden"
                     name="tunnel_id"
-                    value="{{ config.get('tunnel_id', '3d7de42c-4a8a-4447-b14f-053cc485ce6b') }}"
+                    value="{{ config.get('tunnel_id', '') }}"
                 >
 
                 <!-- Botones -->

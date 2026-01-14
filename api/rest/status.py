@@ -111,7 +111,7 @@ def get_execution_status():
         return jsonify({"status": "fail"})
 
     # Consultar estado desde Redis (reemplaza JSON file)
-    state = get_state_manager().load_execution_state(execution_id)
+    state = get_state_manager().get_execution_state(execution_id)
 
     if not state:
         print(f"[EXECUTION] ❌ Ejecución no encontrada en Redis → fail")
