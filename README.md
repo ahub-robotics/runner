@@ -1,690 +1,402 @@
-# Robot Runner v2.0
+# 🤖 Robot Runner
 
-Sistema de ejecución remota de robots de automatización con comunicación HTTPS segura.
+**Sistema de ejecución remota de robots de automatización con comunicación segura y despliegue automático**
 
-**Versión 2.0** - Arquitectura modular, tests completos, compilación multiplataforma.
-
-## 🌐 Compatibilidad Multiplataforma
-
-Robot Runner funciona de manera consistente en **Windows**, **Linux** y **macOS**. Las funciones de control de procesos (pausar, reanudar, detener) utilizan `psutil` para garantizar comportamiento uniforme en todas las plataformas.
-
-| Plataforma | Estado | Versión Mínima |
-|------------|--------|----------------|
-| Windows | ✅ Totalmente soportado | Windows 10+ |
-| Linux | ✅ Totalmente soportado | Kernel 3.x+ |
-| macOS | ✅ Totalmente soportado | 10.14 (Mojave)+ |
-
-Ver [Documentación de Compatibilidad](docs/CROSS-PLATFORM.md) para detalles técnicos.
-
-## 📁 Estructura del Proyecto (v2.0 - Modular)
-
-```
-robotrunner/
-├── run.py                      # Entry point principal
-├── config.json                 # Configuración del robot
-├── app.spec                    # Configuración PyInstaller
-├── requirements.txt            # Dependencias Python
-│
-├── api/                        # 🌐 Interfaz web y REST API
-│   ├── app.py                  # Factory Flask app
-│   ├── middleware.py           # Middleware de autenticación
-│   ├── auth.py                 # Sistema de autenticación
-│   ├── web/                    # Interfaz web
-│   │   ├── auth.py             # Login web
-│   │   ├── ui.py               # Páginas principales
-│   │   └── settings.py         # Configuración
-│   ├── rest/                   # API REST
-│   │   ├── status.py           # /status, /execution
-│   │   ├── execution.py        # /run, /stop, /pause, /resume
-│   │   └── info.py             # /info
-│   ├── streaming/              # Sistema de streaming
-│   │   ├── control.py          # /stream/start, /stream/stop
-│   │   └── feed.py             # /stream/feed (SSE)
-│   ├── tunnel/                 # Gestión de túneles
-│   │   └── routes.py           # /tunnel/*
-│   └── server/                 # Gestión del servidor
-│       └── routes.py           # /server/*
-│
-├── executors/                  # 🤖 Ejecución de robots
-│   ├── runner.py               # Clase Runner (ejecución de robots)
-│   ├── server.py               # Clase Server (orquestador)
-│   ├── tasks.py                # Tareas Celery para ejecución
-│   └── __init__.py
-│
-├── streaming/                  # 📹 Sistema de streaming de pantalla
-│   ├── streamer.py             # Clase ScreenStreamer
-│   ├── tasks.py                # Tareas Celery para streaming
-│   ├── capture.py              # Captura de pantalla
-│   └── __init__.py
-│
-├── shared/                     # 🔧 Código común
-│   ├── config/                 # Configuración
-│   │   ├── loader.py           # Cargar/escribir config.json
-│   │   └── cli.py              # Parsing de argumentos CLI
-│   ├── state/                  # Estado compartido (Redis)
-│   │   ├── redis_manager.py    # Gestión de Redis
-│   │   └── redis_state.py      # Estado de ejecución/streaming
-│   ├── celery_app/             # Celery
-│   │   ├── config.py           # Configuración de Celery
-│   │   └── worker.py           # Worker thread
-│   └── utils/                  # Utilidades
-│       ├── process.py          # Gestión de procesos
-│       ├── ssl_utils.py        # Utilidades SSL
-│       └── tunnel.py           # Utilidades de túnel
-│
-├── gui/                        # 🖥️ Interfaz gráfica
-│   └── tray_app.py             # System tray (pystray)
-│
-├── cli/                        # ⌨️ Entry points CLI
-│   ├── run_server.py           # Iniciar servidor
-│   └── run_tray.py             # Iniciar system tray
-│
-├── tests/                      # 🧪 Suite de tests (161 tests)
-│   ├── conftest.py             # Fixtures compartidas
-│   ├── unit/                   # Tests unitarios (22 archivos)
-│   │   ├── test_config.py
-│   │   ├── test_redis.py
-│   │   ├── test_streaming.py
-│   │   ├── test_executors.py
-│   │   └── ...
-│   └── integration/            # Tests de integración (5 archivos)
-│       ├── test_rest_endpoints.py
-│       ├── test_auth.py
-│       └── ...
-│
-├── build/                      # 📦 Sistema de compilación
-│   ├── README.md               # Documentación de build
-│   ├── hooks/                  # PyInstaller custom hooks
-│   │   ├── hook-celery.py      # Hook para Celery
-│   │   ├── hook-flask.py       # Hook para Flask
-│   │   ├── hook-mss.py         # Hook para MSS
-│   │   └── hook-pystray.py     # Hook para pystray
-│   └── scripts/                # Scripts de compilación
-│       ├── build_macos.sh      # Build para macOS
-│       ├── build_linux.sh      # Build para Linux
-│       └── build_windows.bat   # Build para Windows
-│
-├── docs/                       # 📚 Documentación completa
-│   ├── README.md               # Índice de documentación
-│   ├── architecture/           # Arquitectura del sistema
-│   │   ├── overview.md         # Visión general
-│   │   ├── components.md       # Componentes principales
-│   │   └── data-flow.md        # Flujo de datos
-│   ├── api/                    # Referencia de API
-│   │   ├── rest-api.md         # Endpoints REST
-│   │   └── authentication.md   # Sistema de autenticación
-│   ├── development/            # Guías de desarrollo
-│   │   ├── setup.md            # Configuración de desarrollo
-│   │   ├── testing.md          # Ejecutar tests
-│   │   └── contributing.md     # Guía de contribución
-│   ├── deployment/             # Despliegue
-│   │   ├── installation.md     # Instalación
-│   │   ├── production.md       # Configuración de producción
-│   │   └── compilation.md      # Compilación con PyInstaller
-│   └── security/               # Seguridad
-│       ├── CA-README.md        # Sistema de certificados
-│       └── SECURITY-CHANGELOG.md
-│
-├── ssl/                        # 🔒 Certificados SSL/TLS
-│   ├── ca-cert.pem             # Certificado raíz CA
-│   ├── ca-key.pem              # Clave privada CA
-│   ├── cert.pem                # Certificado del robot
-│   ├── key.pem                 # Clave privada del robot
-│   └── generated/              # Certificados generados
-│       └── robot-X/
-│
-├── templates/                  # 🎨 Plantillas HTML Flask
-│   ├── login.html
-│   ├── connected.html
-│   ├── settings.html
-│   └── stream_view.html
-│
-├── static/                     # 📂 Archivos estáticos
-│   ├── css/
-│   ├── js/
-│   └── images/
-│
-├── resources/                  # 🎨 Recursos de la aplicación
-│   └── logo.ico
-│
-└── Robots/                     # 🤖 Scripts de robots
-    └── robot.py
-```
-
-### ✨ Novedades en v2.0
-
-- **Arquitectura Modular**: Código organizado por funcionalidad (api, executors, streaming, shared)
-- **Suite de Tests**: 161 tests automatizados (87% passing)
-- **Compilación Multiplataforma**: Scripts y hooks para Windows, Linux, macOS
-- **Documentación Completa**: 12+ documentos organizados por categoría
-- **System Tray**: Aplicación de bandeja del sistema (opcional)
-
-## 🚀 Inicio Rápido
-
-### Opción A: Con Túnel de Cloudflare (Recomendado) 🌐
-
-**Ventajas:**
-- ✅ URL única por máquina: `{machine_id}.automatehub.es`
-- ✅ Sin configuración de firewall
-- ✅ SSL automático
-- ✅ Gratuito
-- ✅ Identificación automática por machine_id
-
-**Configurar por primera vez:**
-```bash
-# 1. Instalar dependencias
-pip install -r requirements.txt
-
-# 2. Configurar túnel automáticamente (lee machine_id del config.json, NO lo modifica)
-python3 scripts/setup_machine_tunnel.py
-```
-
-**Uso diario:**
-```bash
-# Terminal 1: Iniciar el túnel
-python3 scripts/start_tunnel.py
-
-# Terminal 2: Iniciar Robot Runner
-python run.py
-```
-
-¡Listo! Tu robot estará en: `https://{machine_id}.automatehub.es`
-
-Ejemplo: Machine ID `38PPU1Z6ZE5C` → `https://38ppu1z6ze5c.automatehub.es`
-
-📖 Ver [Guía Rápida del Túnel](docs/QUICK-START-TUNNEL.md) | [Documentación Completa](docs/CLOUDFLARE-TUNNEL.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/tu-org/robot-runner)
+[![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](docs/general/production-ready.md)
 
 ---
 
-### Opción B: Conexión Directa (Tradicional)
+## 📖 ¿Qué es Robot Runner?
 
-### 1. Instalación de Dependencias
+Robot Runner es una plataforma completa para la **ejecución remota y gestión de robots de automatización**. Permite controlar, monitorizar y desplegar robots en múltiples máquinas de forma centralizada con soporte multiplataforma.
+
+### ✨ Características Principales
+
+- 🌐 **Multiplataforma** - Windows, Linux y macOS
+- 🔒 **Seguro** - SSL/TLS, autenticación por tokens, túneles Cloudflare
+- 📹 **Streaming** - Visualización de pantalla en tiempo real
+- 🔄 **CI/CD Integrado** - Despliegue automático en todas las máquinas
+- 📦 **Compilable** - Genera ejecutables standalone con PyInstaller
+- 🎯 **Escalable** - Despliega en 1 o 1000 máquinas fácilmente
+- 🛠️ **Modular** - Arquitectura limpia y extensible
+- 🧪 **Testeado** - Suite completa de 161 tests automatizados
+
+---
+
+## 🚀 Quick Start
+
+### Instalación Rápida (5 minutos)
 
 ```bash
+# 1. Clonar repositorio
+git clone https://github.com/tu-org/robot-runner
+cd robot-runner
+
+# 2. Instalar dependencias
 pip install -r requirements.txt
-```
 
-### 2. Configurar Certificados SSL
+# 3. Configurar (editar config.json o usar CLI)
+cp config_template.json config.json
 
-**Primera vez (crear CA):**
-```bash
-./scripts/create_ca.sh
-```
-
-**Generar certificado para este robot:**
-```bash
-./scripts/generate_robot_cert.sh robot-1 192.168.1.100
-```
-
-### 3. Configurar la Aplicación
-
-Edita `config.json` o ejecuta la aplicación y configúrala desde la interfaz web:
-
-**Para túnel de Cloudflare:**
-```json
-{
-    "url": "http://127.0.0.1:8088/",
-    "token": "tu-token-del-orquestador",
-    "machine_id": "TU-MACHINE-ID",
-    "license_key": "TU-LICENSE-KEY",
-    "ip": "robot.automatehub.es",
-    "port": "443"
-}
-```
-
-**Para conexión directa:**
-```json
-{
-    "url": "http://192.168.1.50:8088/",
-    "token": "tu-token-del-orquestador",
-    "machine_id": "TU-MACHINE-ID",
-    "license_key": "TU-LICENSE-KEY",
-    "ip": "192.168.1.100",
-    "port": "5055"
-}
-```
-
-### 4. Ejecutar la Aplicación
-
-**Interfaz web (por defecto):**
-```bash
+# 4. Ejecutar
 python run.py
 ```
 
-Accede a `https://localhost:5055` e ingresa el token configurado en `config.json`.
+Accede a `https://localhost:8088` y comienza a ejecutar robots.
 
-**Modo servidor sin interfaz web:**
-```bash
-python run.py --server-only
-```
+📖 **Guías de inicio:**
+- [Instalación Detallada](docs/deployment/installation.md)
+- [Configuración Inicial](docs/development/setup.md)
+- [Configuración con Túnel Cloudflare](docs/general/tunnel-setup.md)
 
-**Con argumentos:**
-```bash
-python run.py --machine_id=ABC123 --license_key=XYZ789
-```
-
-### 5. Configuración por Línea de Comandos
-
-Robot Runner soporta configuración completa por CLI, permitiendo automatizar deployments y configurar sin editar archivos.
-
-#### Ver configuración actual
-```bash
-python run.py --show-config
-```
-
-#### Configurar parámetros del servidor
-```bash
-# Configurar y guardar en config.json
-python run.py \
-  --machine_id=ABC123 \
-  --license_key=XYZ789 \
-  --token=mi-token-secreto \
-  --url=https://console.example.com \
-  --port=5055 \
-  --save
-
-# Usar configuración temporal (solo esta sesión, no guardar)
-python run.py \
-  --machine_id=TEST123 \
-  --port=8080 \
-  --no-save \
-  --server-only
-```
-
-#### Gestión del túnel de Cloudflare
-```bash
-# Ver estado del túnel
-python run.py --tunnel-status
-
-# Configurar túnel automáticamente
-python run.py --machine_id=ABC123 --setup-tunnel
-
-# Iniciar túnel
-python run.py --start-tunnel
-
-# Detener túnel
-python run.py --stop-tunnel
-
-# Configurar subdominio personalizado
-python run.py \
-  --tunnel-subdomain=mi-robot \
-  --machine_id=ABC123 \
-  --setup-tunnel
-```
-
-#### Argumentos disponibles
-
-**Comandos especiales:**
-- `--show-config`: Muestra la configuración actual
-- `--tunnel-status`: Estado del túnel de Cloudflare
-- `--setup-tunnel`: Configura el túnel automáticamente
-- `--start-tunnel`: Inicia el túnel
-- `--stop-tunnel`: Detiene el túnel
-
-**Configuración del servidor:**
-- `--url <URL>`: URL del orquestador
-- `--token <TOKEN>`: Token de autenticación
-- `--machine_id <ID>`: ID único de la máquina
-- `--license_key <KEY>`: License key
-- `--ip <IP>`: IP pública
-- `--port <PORT>`: Puerto del servidor
-- `--folder <PATH>`: Directorio de robots
-
-**Túnel Cloudflare:**
-- `--tunnel-subdomain <NAME>`: Subdominio personalizado
-- `--tunnel-id <ID>`: ID del túnel
-
-**Opciones de ejecución:**
-- `--server-only`: Solo servidor (sin GUI web)
-- `--save`: Guardar configuración en config.json
-- `--no-save`: No guardar (solo para esta sesión)
-
-#### Ejemplos de uso
-
-**Despliegue automatizado:**
-```bash
-#!/bin/bash
-# Script de despliegue automatizado
-
-python run.py \
-  --machine_id=$MACHINE_ID \
-  --license_key=$LICENSE_KEY \
-  --token=$AUTH_TOKEN \
-  --url=$ORCHESTRATOR_URL \
-  --setup-tunnel \
-  --save
-
-python run.py --start-tunnel
-python run.py --server-only
-```
-
-**Testing con configuración temporal:**
-```bash
-# Probar con puerto diferente sin modificar config.json
-python run.py --port=9999 --no-save
-```
-
-**Configuración rápida de nueva máquina:**
-```bash
-# Un solo comando para configurar todo
-python run.py \
-  --machine_id=ROBOT001 \
-  --license_key=LIC-123-456 \
-  --token=my-secret-token \
-  --url=https://console.mycompany.com \
-  --setup-tunnel \
-  --save \
-  --start-tunnel
-```
-
-### 6. Ejecutar Tests (Opcional)
-
-Robot Runner v2.0 incluye una suite completa de tests:
-
-```bash
-# Ejecutar todos los tests
-python -m pytest tests/unit/ tests/integration/ -v
-
-# Con coverage
-python -m pytest tests/unit/ tests/integration/ --cov=. --cov-report=html
-
-# Solo tests unitarios
-python -m pytest tests/unit/ -v
-
-# Solo tests de integración
-python -m pytest tests/integration/ -v
-```
-
-**Resultados esperados:**
-- ✅ 140/161 tests passing (87%)
-- ⚠️ 19 tests requieren ajustes en mocks (no críticos)
-- 📊 Coverage: 42.84% overall, módulos core >70%
-
-📖 Ver [Guía de Testing](docs/development/testing.md) para más detalles.
-
-### 7. Compilar Ejecutable (Multiplataforma)
-
-Robot Runner v2.0 incluye sistema completo de compilación con PyInstaller:
-
-**macOS:**
-```bash
-./build/scripts/build_macos.sh
-# Output: dist/RobotRunner-macOS.zip
-```
-
-**Linux:**
-```bash
-./build/scripts/build_linux.sh
-# Output: dist/RobotRunner-Linux.tar.gz
-```
-
-**Windows:**
-```cmd
-build\scripts\build_windows.bat
-REM Output: dist\RobotRunner-Windows.zip
-```
-
-El ejecutable estará en `dist/RobotRunner/`
-
-📖 Ver [Guía de Compilación](docs/deployment/compilation.md) y [Build README](build/README.md) para más detalles.
+---
 
 ## 📚 Documentación
 
-### Arquitectura
-- **[Visión General](docs/architecture/overview.md)** - Arquitectura del sistema v2.0
-- **[Componentes](docs/architecture/components.md)** - Módulos principales
-- **[Flujo de Datos](docs/architecture/data-flow.md)** - Cómo fluye la información
+### 🎯 Documentación General
 
-### API
-- **[REST API](docs/api/rest-api.md)** - Referencia completa de endpoints
-- **[Autenticación](docs/api/authentication.md)** - Sistema de tokens y seguridad
+| Documento | Descripción |
+|-----------|-------------|
+| [**Listo para Producción**](docs/general/production-ready.md) | Resumen completo de preparación para producción |
+| [**Setup CI/CD**](docs/general/ci-cd-setup.md) | Quick start del sistema de integración continua |
+| [**Configuración de Túneles**](docs/general/tunnel-setup.md) | Configuración de túneles Cloudflare |
+| [**Changelog**](docs/general/changelog.md) | Historial de cambios y versiones |
+| [**Reporte de Validación**](docs/general/validation-report.md) | Validación de funcionalidad y tests |
 
-### Desarrollo
-- **[Setup](docs/development/setup.md)** - Configurar entorno de desarrollo
-- **[Testing](docs/development/testing.md)** - Ejecutar tests y coverage
-- **[Contributing](docs/development/contributing.md)** - Guía de contribución
+### 🏗️ Arquitectura
 
-### Despliegue
-- **[Instalación](docs/deployment/installation.md)** - Instalar Robot Runner
-- **[Producción](docs/deployment/production.md)** - Configuración para producción
-- **[Compilación](docs/deployment/compilation.md)** - Build con PyInstaller
+| Documento | Descripción |
+|-----------|-------------|
+| [**Visión General**](docs/architecture/overview.md) | Arquitectura del sistema completo |
+| [**Componentes**](docs/architecture/components.md) | Descripción de módulos principales |
+| [**Flujo de Datos**](docs/architecture/data-flow.md) | Cómo fluye la información en el sistema |
+| [**Arquitectura Windows**](docs/architecture/windows-architecture.md) | Detalles específicos de Windows |
 
-### Seguridad
-- **[Sistema CA](docs/security/CA-README.md)** - Gestión de certificados SSL
-- **[Changelog de Seguridad](docs/security/SECURITY-CHANGELOG.md)** - Historial de cambios
+### 🔌 API
 
-### Otros
-- **[Compatibilidad Multiplataforma](docs/CROSS-PLATFORM.md)** - Windows, Linux, macOS
-- **[Funcionalidad](docs/FUNCTIONAL-DOCUMENTATION.md)** - Guía de usuario
-- **[Documentación Técnica Legacy](docs/TECHNICAL-DOCUMENTATION.md)** - Referencia v1.x
+| Documento | Descripción |
+|-----------|-------------|
+| [**REST API**](docs/api/rest-api.md) | Referencia completa de endpoints |
+| [**Autenticación**](docs/api/authentication.md) | Sistema de tokens y seguridad |
 
-## 🔐 Seguridad
+### 👨‍💻 Desarrollo
 
-### Autenticación por Token
+| Documento | Descripción |
+|-----------|-------------|
+| [**Setup de Desarrollo**](docs/development/setup.md) | Configurar entorno de desarrollo |
+| [**Testing**](docs/development/testing.md) | Ejecutar tests y coverage |
+| [**Contribuir**](docs/development/contributing.md) | Guía para contribuidores |
 
-Robot Runner requiere un token de autenticación para todas las peticiones API:
+### 🚀 Despliegue y Producción
 
-```python
-import requests
+| Documento | Descripción |
+|-----------|-------------|
+| [**Instalación**](docs/deployment/installation.md) | Instalar Robot Runner paso a paso |
+| [**Producción**](docs/deployment/production.md) | Configuración para entornos de producción |
+| [**Compilación**](docs/deployment/compilation.md) | Compilar ejecutables con PyInstaller |
+| [**Guía de Compilación Completa**](docs/deployment/compilation-guide.md) | Guía detallada de build (6000+ palabras) |
+| [**Cross-Platform**](docs/deployment/cross-platform.md) | Soporte multiplataforma |
+| [**Despliegue en Producción**](docs/deployment/production-deployment.md) | Estrategias de distribución masiva (8000+ palabras) |
 
-headers = {'Authorization': 'Bearer tu-token-secreto'}
-response = requests.get(
-    'https://robot.example.com/status',
-    headers=headers,
-    params={'machine_id': 'ID', 'license_key': 'KEY'}
-)
-```
+### 🔄 CI/CD y Auto-Actualización
 
-**Configuración del Token:**
-- Desde la interfaz web: Ir a `/settings` → Campo "Token de Autenticación"
-- Desde archivo: Editar `config.json` → Campo `"token"`
+| Documento | Descripción |
+|-----------|-------------|
+| [**Guía CI/CD**](docs/deployment/ci-cd-guide.md) | Sistema completo de integración continua (6000+ palabras) |
+| [**Setup CI/CD Rápido**](docs/general/ci-cd-setup.md) | Quick start de 15 minutos |
 
-📖 Ver [Documentación de Autenticación](docs/API-AUTHENTICATION.md) para más detalles
+### 🔐 Seguridad
 
-### SSL/TLS
+| Documento | Descripción |
+|-----------|-------------|
+| [**Sistema CA**](docs/security/ssl-certificates.md) | Gestión de certificados SSL/TLS |
+| [**Changelog de Seguridad**](docs/security/changelog.md) | Historial de cambios de seguridad |
 
-Robot Runner utiliza un sistema de Certificate Authority (CA) propio:
+### 📖 Otros
 
-1. **CA Raíz** - Crea una vez, compartida entre todos los robots
-2. **Certificados por Robot** - Cada robot tiene su certificado único
-3. **Validación en Orquestador** - El orquestador valida todos los certificados con el CA
-
-### Instalación del CA en el Orquestador
-
-```bash
-# Copiar el certificado CA al orquestador
-scp ssl/ca-cert.pem user@orchestrator:/opt/certs/robot-ca.pem
-```
-
-```python
-# En el código del orquestador
-import requests
-
-response = requests.get(
-    'https://192.168.1.100:5055/status',
-    params={'machine_id': 'ID', 'license_key': 'KEY'},
-    verify='/opt/certs/robot-ca.pem'  # Usar CA para validar
-)
-```
-
-## 🛠️ Scripts Útiles
-
-### Túnel de Cloudflare
-
-```bash
-# Configurar por primera vez (NO modifica config.json)
-python3 scripts/setup_machine_tunnel.py
-
-# Iniciar túnel
-python3 scripts/start_tunnel.py
-
-# Ver estado del túnel
-python3 scripts/tunnel_status.py
-
-# Detener túnel
-python3 scripts/stop_tunnel.py
-```
-
-### Certificados SSL
-
-```bash
-# Crear Certificate Authority (una sola vez)
-./scripts/create_ca.sh
-
-# Generar certificado para un nuevo robot
-./scripts/generate_robot_cert.sh robot-2 192.168.1.101 10.0.0.50
-
-# Verificar certificados
-./scripts/verify_certs.sh
-```
-
-## 📡 API Endpoints
-
-**⚠️ Autenticación Requerida**: Todos los endpoints de API requieren un token de autenticación.
-
-| Endpoint | Método | Descripción | Autenticación |
-|----------|--------|-------------|---------------|
-| `/status` | GET | Consultar estado del robot | 🔒 Token + Machine ID + License Key |
-| `/execution` | GET | Estado de ejecución actual | 🔒 Token |
-| `/run` | POST | Iniciar ejecución de robot | 🔒 Token |
-| `/stop` | GET | Detener ejecución actual | 🔒 Token |
-| `/pause` | GET | Pausar ejecución | 🔒 Token |
-| `/resume` | GET | Reanudar ejecución pausada | 🔒 Token |
-| `/block` | GET | Bloquear robot manualmente | 🔒 Token |
-
-**Ejemplo de uso con token:**
-```python
-import requests
-
-headers = {'Authorization': 'Bearer TU_TOKEN_AQUI'}
-response = requests.get('https://robot.example.com/status', headers=headers)
-```
-
-Ver [Documentación de Autenticación](docs/API-AUTHENTICATION.md) para detalles completos.
-
-## 🔧 Tecnologías
-
-### Backend
-- **Flask 3.0+** - Framework web modular con Blueprints
-- **Gunicorn** - Servidor WSGI con SSL
-- **Celery 5.3+** - Tareas asíncronas (ejecución, streaming)
-- **Redis** - Estado compartido y broker de Celery
-- **psutil** - Gestión multiplataforma de procesos
-
-### Testing & Quality
-- **pytest 7.4+** - Framework de testing (161 tests)
-- **pytest-cov** - Code coverage (42.84% overall)
-- **pytest-mock** - Mocking y fixtures
-
-### Build & Deployment
-- **PyInstaller 5.13+** - Compilación multiplataforma
-- **Custom Hooks** - Celery, Flask, MSS, pystray
-- **Build Scripts** - Automatización para Windows/Linux/macOS
-
-### Security
-- **OpenSSL** - Gestión de certificados CA
-- **Token-based Auth** - Sistema de autenticación personalizado
-- **Cloudflare Tunnel** - Túnel seguro con subdominios únicos
-
-### GUI
-- **pystray** - System tray multiplataforma
-- **PIL/Pillow** - Iconos y imágenes
-
-### Streaming
-- **mss** - Captura de pantalla multiplataforma
-- **Server-Sent Events (SSE)** - Streaming en tiempo real
-
-## ⚙️ Configuración Avanzada
-
-### Cambiar Puerto
-
-Edita `config.json`:
-```json
-{
-    "port": "8443"
-}
-```
-
-### Ejecutar como Servicio
-
-**Linux (systemd):**
-```bash
-sudo cp robotrunner.service /etc/systemd/system/
-sudo systemctl enable robotrunner
-sudo systemctl start robotrunner
-```
-
-**Windows (Task Scheduler):**
-- Crear tarea programada
-- Ejecutar al inicio del sistema
-- Programa: `RobotRunner.exe --server-only`
-
-## 🐛 Resolución de Problemas
-
-### Error de certificado SSL
-```bash
-# Regenerar certificados
-./scripts/generate_robot_cert.sh robot-1 $(curl -s ifconfig.me)
-```
-
-### Puerto en uso
-```bash
-# Linux/macOS
-lsof -ti:5055 | xargs kill -9
-
-# Windows (PowerShell como Admin)
-Get-Process -Id (Get-NetTCPConnection -LocalPort 5055).OwningProcess | Stop-Process
-```
-
-### Ver logs del servidor
-```bash
-# macOS/Linux
-tail -f /tmp/server.log
-
-# Windows
-type %TEMP%\server.log
-```
-
-## 📝 Licencia
-
-[Especificar licencia]
-
-## 👥 Contribuir
-
-[Instrucciones para contribuir]
-
-## 📧 Soporte
-
-Para problemas o preguntas, consulta la [Documentación Funcional](docs/FUNCTIONAL-DOCUMENTATION.md) o abre un issue.
+| Documento | Descripción |
+|-----------|-------------|
+| [**Documentación Funcional**](docs/functional-documentation.md) | Guía de usuario completa |
+| [**Documentación Técnica**](docs/technical-documentation.md) | Referencia técnica detallada |
+| [**Nuevas Funcionalidades**](docs/nuevas-funcionalidades.md) | Características añadidas recientemente |
+| [**Setup Windows**](docs/windows-setup.md) | Configuración específica de Windows |
 
 ---
 
-## 🌐 Configuración del Túnel de Cloudflare
+## 🎯 Casos de Uso
 
-Robot Runner utiliza túneles de Cloudflare con subdominios únicos por máquina:
+### 1. Instalación en Una Máquina
 
-- **URL Pública:** `https://{machine_id}.automatehub.es` (único por máquina)
-- **Formato:** Machine ID en lowercase + `.automatehub.es`
-- **Ejemplo:** Machine ID `38PPU1Z6ZE5C` → `https://38ppu1z6ze5c.automatehub.es`
-- **Tunnel ID:** `3d7de42c-4a8a-4447-b14f-053cc485ce6b` (compartido)
-- **Puerto Local:** `5055` (HTTPS)
-
-### Configurar nueva máquina:
 ```bash
-python3 scripts/setup_machine_tunnel.py  # Lee machine_id (NO modifica config.json)
+# Instalación automatizada (Windows)
+.\installers\windows\install_production.ps1
+
+# O instalación manual
+pip install -r requirements.txt
+python run.py
 ```
 
-### Uso diario:
-```bash
-python3 scripts/start_tunnel.py  # Inicia el túnel
-python run.py                    # Inicia Robot Runner
-```
+⏱️ **Tiempo:** 7 minutos
 
-Cada máquina tendrá automáticamente su propio subdominio único basado en su `machine_id`.
-
-Ver [documentación completa del túnel](docs/CLOUDFLARE-TUNNEL.md) para más detalles.
+📖 [Ver guía completa](docs/deployment/installation.md)
 
 ---
 
-**Última actualización:** 2026-01-08
-**Versión:** 2.0.0 (Arquitectura modular + Tests + Compilación multiplataforma)
+### 2. Despliegue en Múltiples Máquinas (5-50)
+
+```powershell
+# Crear lista de máquinas
+# Editar: installers/windows/machines.txt
+
+# Desplegar remotamente
+.\installers\windows\deploy_multiple.ps1 `
+    -ComputerFile "machines.txt" `
+    -Token "YOUR_TOKEN"
+```
+
+⏱️ **Tiempo:** 15-20 minutos para 50 máquinas (paralelo)
+
+📖 [Ver guía de despliegue masivo](docs/deployment/production-deployment.md#despliegue-masivo)
+
+---
+
+### 3. Compilar y Distribuir Binarios (100+ máquinas)
+
+```bash
+# 1. Compilar ejecutable
+.\build\scripts\build_windows.bat
+
+# 2. Crear paquete distributable
+.\build\scripts\create_installer_zip.bat
+
+# 3. Distribuir ZIP a usuarios
+# dist/RobotRunner-v1.0.0-Windows.zip
+```
+
+⏱️ **Tiempo:** 2-3 minutos por usuario final
+
+📖 [Ver guía de compilación](docs/deployment/compilation-guide.md)
+
+---
+
+### 4. CI/CD - Despliegue Automático
+
+```bash
+# 1. Hacer cambios en el código
+git commit -m "Add new feature"
+
+# 2. Crear tag de versión
+git tag -a v1.1.0 -m "Release 1.1.0"
+git push origin v1.1.0
+
+# 3. ¡GitHub Actions hace el resto!
+#    - Compila binarios (Windows + Linux)
+#    - Crea GitHub Release
+#    - Todas las máquinas se actualizan automáticamente
+```
+
+⏱️ **Tiempo:** 15-20 minutos desde push hasta todas las máquinas actualizadas
+
+📖 [Ver guía CI/CD](docs/deployment/ci-cd-guide.md)
+
+---
+
+## 🛠️ Tecnologías
+
+**Backend:**
+- Flask 3.0+ (Web framework modular)
+- Gunicorn (WSGI server con SSL)
+- Celery 5.3+ (Tareas asíncronas)
+- Redis (Estado compartido)
+- RabbitMQ (Message broker)
+
+**Testing:**
+- pytest 7.4+ (161 tests)
+- pytest-cov (42.84% coverage)
+- pytest-mock
+
+**Build & Deploy:**
+- PyInstaller 6.10+ (Compilación)
+- GitHub Actions (CI/CD)
+- PowerShell (Scripts Windows)
+
+**Security:**
+- OpenSSL (Certificados CA)
+- Token-based Auth
+- Cloudflare Tunnel
+
+---
+
+## 📊 Estructura del Proyecto
+
+```
+robot-runner/
+├── run.py                          # Entry point principal
+├── config.json                     # Configuración
+├── requirements.txt                # Dependencias
+│
+├── api/                            # 🌐 Interfaz web y REST API
+│   ├── web/                        # Interfaz web
+│   ├── rest/                       # API REST
+│   ├── streaming/                  # Sistema de streaming
+│   └── tunnel/                     # Gestión de túneles
+│
+├── executors/                      # 🤖 Ejecución de robots
+│   ├── runner.py
+│   ├── server.py
+│   └── tasks.py
+│
+├── streaming/                      # 📹 Streaming de pantalla
+│   ├── streamer.py
+│   ├── capture.py
+│   └── tasks.py
+│
+├── shared/                         # 🔧 Código común
+│   ├── config/                     # Configuración
+│   ├── state/                      # Estado (Redis)
+│   ├── celery_app/                 # Celery
+│   ├── updater/                    # Auto-actualización
+│   └── utils/                      # Utilidades
+│
+├── installers/                     # 📦 Scripts de instalación
+│   └── windows/
+│       ├── install_production.ps1  # Instalación desatendida
+│       ├── deploy_multiple.ps1     # Despliegue masivo
+│       └── install_all.ps1         # Instalación interactiva
+│
+├── build/                          # 🏗️ Sistema de compilación
+│   ├── scripts/                    # Scripts de build
+│   └── hooks/                      # PyInstaller hooks
+│
+├── docs/                           # 📚 Documentación completa
+│   ├── general/                    # Documentación general
+│   ├── architecture/               # Arquitectura
+│   ├── api/                        # API Reference
+│   ├── development/                # Guías de desarrollo
+│   ├── deployment/                 # Despliegue y producción
+│   └── security/                   # Seguridad
+│
+├── update_server/                  # 🔄 Servidor de actualizaciones
+│   └── app.py                      # API Flask
+│
+├── tests/                          # 🧪 Suite de tests
+│   ├── unit/                       # Tests unitarios
+│   └── integration/                # Tests de integración
+│
+└── .github/workflows/              # ⚙️ GitHub Actions CI/CD
+    └── build-and-release.yml
+```
+
+---
+
+## 🔒 Seguridad
+
+Robot Runner implementa múltiples capas de seguridad:
+
+- ✅ **Autenticación por Token** - Todas las peticiones API requieren token
+- ✅ **SSL/TLS** - Comunicación cifrada con certificados CA propios
+- ✅ **Cloudflare Tunnel** - Túnel seguro sin exponer puertos
+- ✅ **Verificación de Checksums** - SHA256 en descargas de actualizaciones
+- ✅ **Backup Automático** - Antes de cada actualización
+- ✅ **Rollback Automático** - Si una actualización falla
+
+📖 [Ver documentación de seguridad](docs/security/ssl-certificates.md)
+
+---
+
+## 🎓 Comparativa de Métodos de Distribución
+
+| Método | Tiempo Setup | Complejidad | Ideal Para |
+|--------|--------------|-------------|------------|
+| **Script Automatizado** | 7 min | ⭐ Baja | 1-10 máquinas |
+| **Despliegue Remoto** | 15-20 min (50 máquinas) | ⭐⭐ Media | 10-100 máquinas |
+| **Binarios Compilados** | 2 min/usuario | ⭐⭐ Media | 100+ máquinas |
+| **CI/CD Auto-Update** | 15-20 min (todas) | ⭐⭐⭐ Alta | Cualquier escala |
+
+📖 [Ver comparativa completa](docs/deployment/production-deployment.md#comparativa-de-estrategias)
+
+---
+
+## 🚦 Estado del Proyecto
+
+### ✅ Completado
+
+- [x] Arquitectura modular v2.0
+- [x] Suite de tests (161 tests, 87% passing)
+- [x] Compilación multiplataforma (Windows, Linux, macOS)
+- [x] Sistema de instalación automatizada
+- [x] Despliegue masivo en múltiples máquinas
+- [x] CI/CD con GitHub Actions
+- [x] Auto-actualización en clientes
+- [x] Servidor de actualizaciones
+- [x] Documentación completa (20+ documentos)
+
+### 🔜 Próximamente
+
+- [ ] Dashboard web de administración
+- [ ] Métricas y monitorización (Prometheus/Grafana)
+- [ ] Soporte para Docker/Kubernetes
+- [ ] API REST v2 con FastAPI
+- [ ] WebSocket para comunicación en tiempo real
+
+---
+
+## 📞 Soporte y Contribución
+
+### 🐛 Reportar Problemas
+
+¿Encontraste un bug? [Abre un issue](https://github.com/tu-org/robot-runner/issues)
+
+### 💡 Sugerir Mejoras
+
+¿Tienes una idea? [Crea una discussion](https://github.com/tu-org/robot-runner/discussions)
+
+### 🤝 Contribuir
+
+Lee nuestra [guía de contribución](docs/development/contributing.md)
+
+### 📧 Contacto
+
+Para soporte empresarial: support@tuempresa.com
+
+---
+
+## 📜 Licencia
+
+Este proyecto está licenciado bajo [MIT License](LICENSE)
+
+---
+
+## 🙏 Agradecimientos
+
+Desarrollado con ❤️ usando:
+- [Flask](https://flask.palletsprojects.com/)
+- [Celery](https://docs.celeryq.dev/)
+- [PyInstaller](https://pyinstaller.org/)
+- [GitHub Actions](https://github.com/features/actions)
+
+---
+
+## 📈 Estadísticas
+
+![GitHub Stars](https://img.shields.io/github/stars/tu-org/robot-runner?style=social)
+![GitHub Forks](https://img.shields.io/github/forks/tu-org/robot-runner?style=social)
+![GitHub Issues](https://img.shields.io/github/issues/tu-org/robot-runner)
+![GitHub Pull Requests](https://img.shields.io/github/issues-pr/tu-org/robot-runner)
+
+---
+
+**¿Listo para empezar?** 🚀
+
+Elige tu método preferido:
+- 📖 [Instalación rápida en una máquina](docs/deployment/installation.md)
+- 🌐 [Despliegue en múltiples máquinas](docs/deployment/production-deployment.md)
+- 🔄 [Configurar CI/CD automático](docs/general/ci-cd-setup.md)
+
+---
+
+**Última actualización:** 2026-01-16
+**Versión:** 2.0.0

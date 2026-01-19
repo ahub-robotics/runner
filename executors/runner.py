@@ -511,7 +511,7 @@ class Runner:
         try:
             if platform.system() == 'Windows':
                 setup_command = [
-                    f"py -m venv {self.robot_folder}\\venv",
+                    f"python -m venv {self.robot_folder}\\venv",
                     f"{self.robot_folder}\\venv\\Scripts\\activate",
                     f"\"{self.robot_folder}\\venv\\Scripts\\python.exe\" -m pip install -q -r \"{self.robot_folder}\\requirements.txt\""
                 ]

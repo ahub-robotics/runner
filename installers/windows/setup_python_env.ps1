@@ -121,7 +121,7 @@ Write-Host ""
 # Verificar instalación de paquetes críticos
 Write-Host "5. Verificando paquetes críticos..." -ForegroundColor Yellow
 
-$CriticalPackages = @("flask", "celery", "waitress", "pika", "pillow")
+$CriticalPackages = @("flask", "celery", "gunicorn", "redis", "pillow", "websockets")
 $AllInstalled = $true
 
 foreach ($package in $CriticalPackages) {
