@@ -1,0 +1,119 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: RobotRunner.exe
+            asset_name: RobotRunner-Windows-x64.exe
+          - os: ubuntu-latest
+            artifact_name: RobotRunner
+            asset_name: RobotRunner-Linux-x64
+          - os: macos-latest
+            artifact_name: RobotRunner
+            asset_name: RobotRunner-macOS-x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.10.0
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller app-onefile.spec --clean
+
+      - name: Rename artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Move-Item -Path "dist/${{ matrix.artifact_name }}" -Destination "dist/${{ matrix.asset_name }}"
+        shell: pwsh
+
+      - name: Rename and set permissions (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mv dist/${{ matrix.artifact_name }} dist/${{ matrix.asset_name }}
+          chmod +x dist/${{ matrix.asset_name }}
+
+      - name: Generate SHA256 checksum (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd dist
+          (Get-FileHash -Algorithm SHA256 "${{ matrix.asset_name }}").Hash | Out-File -Encoding ASCII "${{ matrix.asset_name }}.sha256"
+        shell: pwsh
+
+      - name: Generate SHA256 checksum (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd dist
+          shasum -a 256 ${{ matrix.asset_name }} | awk '{print $1}' > ${{ matrix.asset_name }}.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: |
+            dist/${{ matrix.asset_name }}
+            dist/${{ matrix.asset_name }}.sha256
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "✅ Release ${{ steps.get_version.outputs.VERSION }} created successfully!"
+          echo ""
+          echo "📦 Artifacts uploaded:"
+          ls -lh release/

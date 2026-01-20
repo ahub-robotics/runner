@@ -165,6 +165,32 @@ if ($setupTunnel -eq "s" -or $setupTunnel -eq "S") {
     Write-Host "   python setup_tunnel.py" -ForegroundColor Gray
 }
 
+# Paso opcional: Auto-Update Service
+Write-Host ""
+Write-Host "📝 PASO OPCIONAL: Configurar Auto-Actualización" -ForegroundColor Cyan
+Write-Host ""
+$setupAutoUpdate = Read-Host "¿Quieres configurar actualizaciones automáticas? (s/n) [n]"
+
+if ($setupAutoUpdate -eq "s" -or $setupAutoUpdate -eq "S") {
+    Write-Host ""
+    Write-Host "🔄 Configurando Auto-Actualización..." -ForegroundColor Yellow
+    Write-Host ""
+
+    try {
+        & "$ScriptDir\setup_autoupdate.ps1"
+    } catch {
+        Write-Host ""
+        Write-Host "⚠️  Error al configurar auto-update: $_" -ForegroundColor Yellow
+        Write-Host "   Puedes ejecutarlo manualmente más tarde:" -ForegroundColor Gray
+        Write-Host "   .\installers\windows\setup_autoupdate.ps1" -ForegroundColor Gray
+    }
+} else {
+    Write-Host ""
+    Write-Host "⏭️  Configuración de auto-update omitida" -ForegroundColor Gray
+    Write-Host "   Para configurarlo más tarde, ejecuta:" -ForegroundColor Gray
+    Write-Host "   .\installers\windows\setup_autoupdate.ps1" -ForegroundColor Gray
+}
+
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "  🎉 ¡TODO LISTO!" -ForegroundColor Green

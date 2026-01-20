@@ -96,17 +96,13 @@ Accede a `https://localhost:8088` y comienza a ejecutar robots.
 |-----------|-------------|
 | [**Instalación**](docs/deployment/installation.md) | Instalar Robot Runner paso a paso |
 | [**Producción**](docs/deployment/production.md) | Configuración para entornos de producción |
+| [**Despliegue en Producción**](docs/deployment/production-deployment.md) | Estrategias de despliegue masivo |
 | [**Compilación**](docs/deployment/compilation.md) | Compilar ejecutables con PyInstaller |
-| [**Guía de Compilación Completa**](docs/deployment/compilation-guide.md) | Guía detallada de build (6000+ palabras) |
+| [**Guía de Compilación Completa**](docs/deployment/compilation-guide.md) | Guía detallada de build multiplataforma |
+| [**CI/CD Completo**](docs/deployment/ci-cd-guide.md) | Sistema completo de integración y despliegue continuo |
+| [**Setup CI/CD Rápido**](docs/general/ci-cd-setup.md) | Quick start de CI/CD en 15 minutos |
+| [**Auto-Actualización**](docs/deployment/auto-update-guide.md) | Sistema de updates automáticos |
 | [**Cross-Platform**](docs/deployment/cross-platform.md) | Soporte multiplataforma |
-| [**Despliegue en Producción**](docs/deployment/production-deployment.md) | Estrategias de distribución masiva (8000+ palabras) |
-
-### 🔄 CI/CD y Auto-Actualización
-
-| Documento | Descripción |
-|-----------|-------------|
-| [**Guía CI/CD**](docs/deployment/ci-cd-guide.md) | Sistema completo de integración continua (6000+ palabras) |
-| [**Setup CI/CD Rápido**](docs/general/ci-cd-setup.md) | Quick start de 15 minutos |
 
 ### 🔐 Seguridad
 
