@@ -30,7 +30,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from shared.updater import AutoUpdater, get_current_version
-from shared.config.loader import load_config
+from shared.config.loader import get_config_data
 
 
 def setup_logging():
@@ -108,7 +108,7 @@ def main():
     try:
         # Load config to check if auto-update is enabled
         try:
-            config = load_config()
+            config = get_config_data()
             auto_update_enabled = config.get('auto_update_enabled', True)
 
             if not auto_update_enabled:
