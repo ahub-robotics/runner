@@ -24,7 +24,7 @@ NC='\033[0m' # No Color
 # Default values
 INTERVAL=3600
 CHANNEL="stable"
-REPO="tu-usuario/robotrunner_windows"
+REPO="ahub-robotics/runner"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

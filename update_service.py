@@ -72,7 +72,7 @@ def main():
     parser.add_argument(
         '--repo',
         type=str,
-        default='tu-usuario/robotrunner_windows',
+        default='ahub-robotics/runner',
         help='GitHub repository (format: owner/repo)'
     )
     parser.add_argument(
