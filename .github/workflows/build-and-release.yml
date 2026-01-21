@@ -40,6 +40,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller==6.10.0
+          pip install jaraco.text jaraco.functools jaraco.context more-itertools --upgrade
 
       - name: Build with PyInstaller
         run: |
