@@ -93,6 +93,10 @@ a = Analysis(
         # Other
         'requests', 'yaml', 'json', 'subprocess', 'threading', 'multiprocessing',
         'queue', 'ssl', 'base64', 'io',
+
+        # Fix for pkg_resources
+        'jaraco.text', 'jaraco', 'jaraco.functools', 'jaraco.context',
+        'more_itertools',
     ],
     hookspath=['build/hooks'] if os.path.exists('build/hooks') else [],
     hooksconfig={},

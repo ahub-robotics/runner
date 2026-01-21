@@ -51,3 +51,7 @@ waitress==2.1.2
 wcwidth==0.2.13
 websockets==14.1
 Werkzeug==3.0.3
+jaraco.text==4.0.0
+jaraco.functools==4.4.0
+jaraco.context==6.1.0
+more-itertools==10.8.0
