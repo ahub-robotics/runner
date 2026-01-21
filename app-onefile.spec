@@ -138,4 +138,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='resources/logo.ico' if os.path.exists('resources/logo.ico') else None,
+
+    # Windows version information
+    version='branding/version_info.py' if os.path.exists('branding/version_info.py') and IS_WINDOWS else None,
 )

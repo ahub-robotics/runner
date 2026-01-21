@@ -1,0 +1,77 @@
+{
+  "name": "Robot Runner",
+  "display_name": "Robot Runner",
+  "description": "Sistema de ejecución remota de robots de automatización con comunicación segura y despliegue automático",
+  "version": "2.0.0",
+  "company": "AHUB Robotics",
+  "company_short": "AHUB",
+  "copyright": "Copyright © 2026 AHUB Robotics. All rights reserved.",
+  "website": "https://github.com/ahub-robotics/runner",
+  "support_email": "support@ahubrobotics.com",
+  "bundle_id": "com.ahubrobotics.robotrunner",
+  "executable_name": "RobotRunner",
+
+  "windows": {
+    "product_name": "Robot Runner",
+    "internal_name": "RobotRunner",
+    "file_description": "Robot Runner - Remote Automation System",
+    "original_filename": "RobotRunner.exe",
+    "legal_copyright": "Copyright © 2026 AHUB Robotics",
+    "company_name": "AHUB Robotics",
+    "file_version": "2.0.0.0",
+    "product_version": "2.0.0.0",
+    "comments": "Professional automation deployment platform",
+    "trademark": "Robot Runner™"
+  },
+
+  "macos": {
+    "bundle_name": "Robot Runner",
+    "bundle_identifier": "com.ahubrobotics.robotrunner",
+    "bundle_version": "2.0.0",
+    "bundle_short_version": "2.0.0",
+    "copyright": "Copyright © 2026 AHUB Robotics. All rights reserved.",
+    "category": "public.app-category.developer-tools",
+    "minimum_system_version": "10.13.0",
+    "signing_identity": "Developer ID Application: AHUB Robotics",
+    "team_id": "YOUR_TEAM_ID"
+  },
+
+  "linux": {
+    "package_name": "robotrunner",
+    "description": "Remote automation execution platform for Robot Framework",
+    "section": "devel",
+    "priority": "optional",
+    "maintainer": "AHUB Robotics <support@ahubrobotics.com>",
+    "homepage": "https://github.com/ahub-robotics/runner",
+    "dependencies": [
+      "python3 (>= 3.11)",
+      "redis-server",
+      "openssl"
+    ]
+  },
+
+  "security": {
+    "windows_authenticode": {
+      "required": true,
+      "timestamp_url": "http://timestamp.digicert.com",
+      "sign_tool": "signtool.exe"
+    },
+    "macos_notarization": {
+      "required": true,
+      "apple_id": "developer@ahubrobotics.com",
+      "team_id": "YOUR_TEAM_ID",
+      "app_specific_password_keychain": "AC_PASSWORD"
+    },
+    "linux_gpg": {
+      "required": false,
+      "key_id": "YOUR_GPG_KEY_ID"
+    }
+  },
+
+  "features": {
+    "auto_update": true,
+    "telemetry": false,
+    "crash_reporting": false,
+    "analytics": false
+  }
+}
